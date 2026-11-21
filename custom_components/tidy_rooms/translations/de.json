@@ -1,0 +1,186 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Dieser Saugroboter wird bereits von Tidy Rooms verwaltet."
+    },
+    "step": {
+      "user": {
+        "title": "Tidy Rooms",
+        "description": "Wähle den Saugroboter. Füge danach jeden Raum auf der Seite der Integration hinzu.",
+        "data": {
+          "vacuum": "Saugroboter"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zeitplan",
+        "data": {
+          "quiet_start": "Beginn der Ruhezeit",
+          "quiet_end": "Ende der Ruhezeit",
+          "wake_sensors": "Aufwach-Sensoren",
+          "wake_minutes": "Minuten Anwesenheit, um als wach zu gelten",
+          "wake_days": "Tage mit Aufwach-Prüfung",
+          "min_battery": "Mindestakkustand zum Starten",
+          "work_mode_entity": "Auswahl des Arbeitsmodus (optional)",
+          "start_timeout": "Minuten Wartezeit auf den Start vor einem neuen Versuch",
+          "job_done_delay": "Minuten in der Station, bis ein Auftrag als erledigt gilt",
+          "battery_entity": "Akkusensor (optional)",
+          "finished_event": "Ereignis „Auftrag beendet“ (optional)",
+          "job_entity": "Sensor „Reinigung läuft“ (empfohlen)"
+        },
+        "data_description": {
+          "quiet_start": "Keine Reinigung zwischen Beginn und Ende, auch nicht nach einer Frist.",
+          "wake_sensors": "An den gewählten Tagen beginnt die Reinigung erst, wenn einer dieser Sensoren für die angegebenen Minuten jemanden erkannt hat (zum Beispiel beim Frühstück in der Küche). Leer lassen, um die Prüfung zu überspringen.",
+          "work_mode_entity": "Eine Select-Entität des Roboters, die zwischen nur Saugen und Saugen mit Wischen umschaltet.",
+          "job_done_delay": "Nur ohne Sensor „Reinigung läuft“ verwendet. Roboter, die den Wischmopp waschen, kehren während eines Auftrags zur Station zurück: Der Auftrag gilt erst als erledigt, wenn der Roboter so lange in der Station bleibt. Auch eine Rückkehr zum Laden zählt als Ende.",
+          "battery_entity": "Für Roboter, die den Akkustand in einem eigenen Sensor melden.",
+          "finished_event": "Eine Ereignis-Entität des Roboters, die am Ende eines Auftrags auslöst. Die Typen finished und finished_with_warnings markieren den Auftrag sofort als erledigt, andere Typen als abgebrochen.",
+          "job_entity": "Ein binärer Sensor des Roboters, der vom Anfang bis zum Ende einer Reinigung an ist, auch wenn der Roboter mittendrin in der Station ist. Wenn gesetzt, bestimmt er, wann ein Auftrag beendet ist, und ein anderswo gestarteter Auftrag (App, Zeitplan) hält den Roboter beschäftigt."
+        }
+      },
+      "robot": {
+        "title": "Robotereinstellungen",
+        "data": {
+          "normal_fan_speed": "Normale Saugstufe",
+          "quiet_fan_speed": "Leise Saugstufe",
+          "full_mode_option": "Modus für Saugen und Wischen",
+          "vacuum_mode_option": "Modus für nur Saugen"
+        },
+        "data_description": {
+          "quiet_fan_speed": "Nur verwendet, wenn ein Raum nach seiner Frist gereinigt werden muss, während jemand da ist."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Raum",
+      "initiate_flow": {
+        "user": "Raum hinzufügen"
+      },
+      "abort": {
+        "reconfigure_successful": "Raum aktualisiert."
+      },
+      "error": {
+        "area_already_configured": "Dieser Bereich hat bereits einen Raum.",
+        "proxy_with_occupancy": "Verwende entweder die Sensoren des Raums oder die anderer Räume, nicht beide.",
+        "vacuum_less_than_full": "Saugdurchgänge schließen die Wischdurchgänge ein: Es können nicht weniger sein."
+      },
+      "step": {
+        "user": {
+          "title": "Raum hinzufügen",
+          "description": "Der Bereich muss den Räumen des Roboters zugeordnet sein (Einstellungen der Staubsauger-Entität, „Bereiche“).",
+          "data": {
+            "area": "Bereich",
+            "occupancy_sensors": "Anwesenheitssensoren in diesem Raum",
+            "proxy_sensors": "Anwesenheitssensoren in anderen Räumen",
+            "empty_minutes": "Minuten leer vor der Reinigung",
+            "full_per_day": "Saug- und Wischdurchgänge pro Tag",
+            "vacuum_per_day": "Saugdurchgänge pro Tag",
+            "min_gap_hours": "Mindeststunden zwischen zwei Durchgängen",
+            "full_deadline": "Frist für Saugen und Wischen",
+            "vacuum_deadline": "Frist für Saugen",
+            "clean_action": "Eigene Reinigungsaktion (optional)"
+          },
+          "data_description": {
+            "proxy_sensors": "Für Räume ohne eigenen Sensor: Der Raum gilt als frei, solange einer dieser Sensoren anderswo jemanden erkennt.",
+            "vacuum_per_day": "Ein Saug- und Wischdurchgang zählt auch als Saugdurchgang.",
+            "full_deadline": "Nach dieser Uhrzeit wird der Raum auch gereinigt, wenn jemand da ist, mit der leisen Saugstufe. Leer lassen, um es nie zu erzwingen.",
+            "clean_action": "Ersetzt die Standard-Bereichsreinigung für Roboter, deren Integration sie nicht unterstützt. Variablen: room, area_id, kind (full oder vacuum), quiet, vacuum_entity."
+          }
+        },
+        "reconfigure": {
+          "title": "Raum bearbeiten",
+          "data": {
+            "area": "Bereich",
+            "occupancy_sensors": "Anwesenheitssensoren in diesem Raum",
+            "proxy_sensors": "Anwesenheitssensoren in anderen Räumen",
+            "empty_minutes": "Minuten leer vor der Reinigung",
+            "full_per_day": "Saug- und Wischdurchgänge pro Tag",
+            "vacuum_per_day": "Saugdurchgänge pro Tag",
+            "min_gap_hours": "Mindeststunden zwischen zwei Durchgängen",
+            "full_deadline": "Frist für Saugen und Wischen",
+            "vacuum_deadline": "Frist für Saugen",
+            "clean_action": "Eigene Reinigungsaktion (optional)"
+          },
+          "data_description": {
+            "proxy_sensors": "Für Räume ohne eigenen Sensor: Der Raum gilt als frei, solange einer dieser Sensoren anderswo jemanden erkennt.",
+            "vacuum_per_day": "Ein Saug- und Wischdurchgang zählt auch als Saugdurchgang.",
+            "full_deadline": "Nach dieser Uhrzeit wird der Raum auch gereinigt, wenn jemand da ist, mit der leisen Saugstufe. Leer lassen, um es nie zu erzwingen.",
+            "clean_action": "Ersetzt die Standard-Bereichsreinigung für Roboter, deren Integration sie nicht unterstützt. Variablen: room, area_id, kind (full oder vacuum), quiet, vacuum_entity."
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "weekday": {
+      "options": {
+        "mon": "Montag",
+        "tue": "Dienstag",
+        "wed": "Mittwoch",
+        "thu": "Donnerstag",
+        "fri": "Freitag",
+        "sat": "Samstag",
+        "sun": "Sonntag"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "job": {
+        "name": "Auftrag",
+        "state": {
+          "idle": "Untätig",
+          "starting": "Startet",
+          "running": "Reinigt",
+          "finishing": "Wird beendet"
+        }
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "disabled": "Deaktiviert",
+          "done": "Für heute erledigt",
+          "waiting_gap": "Nächster Durchgang später",
+          "waiting_occupied": "Wartet, bis der Raum leer ist",
+          "waiting_quiet_hours": "Ruhezeit",
+          "waiting_awake": "Wartet auf das Aufwachen",
+          "waiting_robot": "Wartet auf den Roboter",
+          "ready": "Bereit",
+          "cleaning": "Reinigt"
+        }
+      },
+      "last_full": {
+        "name": "Letztes Saugen und Wischen"
+      },
+      "last_vacuum": {
+        "name": "Letztes Saugen"
+      }
+    },
+    "switch": {
+      "enabled": {
+        "name": "Automatische Reinigung"
+      },
+      "room_enabled": {
+        "name": "Automatische Reinigung"
+      }
+    },
+    "button": {
+      "clean_now_full": {
+        "name": "Jetzt saugen und wischen"
+      },
+      "clean_now_vacuum": {
+        "name": "Jetzt saugen"
+      }
+    }
+  },
+  "exceptions": {
+    "robot_busy": {
+      "message": "Der Roboter reinigt bereits einen Raum."
+    }
+  }
+}

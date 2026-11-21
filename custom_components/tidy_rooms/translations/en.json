@@ -1,0 +1,186 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This robot vacuum is already managed by Tidy Rooms."
+    },
+    "step": {
+      "user": {
+        "title": "Tidy Rooms",
+        "description": "Choose the robot vacuum. Then add each room from the integration page.",
+        "data": {
+          "vacuum": "Robot vacuum"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Schedule",
+        "data": {
+          "quiet_start": "Quiet hours start",
+          "quiet_end": "Quiet hours end",
+          "wake_sensors": "Wake-up sensors",
+          "wake_minutes": "Minutes of presence to count as awake",
+          "wake_days": "Days with the wake-up check",
+          "min_battery": "Minimum battery to start",
+          "work_mode_entity": "Work mode selector (optional)",
+          "start_timeout": "Minutes to wait for the robot to start before retrying",
+          "job_done_delay": "Minutes docked before a job counts as done",
+          "battery_entity": "Battery sensor (optional)",
+          "finished_event": "Job finished event (optional)",
+          "job_entity": "Cleaning job sensor (recommended)"
+        },
+        "data_description": {
+          "quiet_start": "No cleaning between start and end, not even after a deadline.",
+          "wake_sensors": "On the selected days, cleaning starts only after one of these sensors has detected someone for the given minutes (for example breakfast in the kitchen). Leave empty to skip the check.",
+          "work_mode_entity": "A select entity of the robot that switches between vacuum only and vacuum and mop.",
+          "job_done_delay": "Used only without a cleaning job sensor. Robots that wash the mop go back to the dock during a job: the job counts as done only after the robot stays docked this long. A return to recharge also counts as the end.",
+          "battery_entity": "For robots that report the battery in a separate sensor.",
+          "finished_event": "An event entity of the robot that fires when a job ends. Event types finished and finished_with_warnings mark the job as done right away; other types mark it as stopped.",
+          "job_entity": "A binary sensor of the robot that is on from the start to the end of a cleaning job, also while the robot is at the dock in the middle of it. When set, it decides when a job is over, and a job started elsewhere (app, schedule) keeps the robot busy."
+        }
+      },
+      "robot": {
+        "title": "Robot settings",
+        "data": {
+          "normal_fan_speed": "Normal fan speed",
+          "quiet_fan_speed": "Quiet fan speed",
+          "full_mode_option": "Work mode for vacuum and mop",
+          "vacuum_mode_option": "Work mode for vacuum only"
+        },
+        "data_description": {
+          "quiet_fan_speed": "Used only when a room must be cleaned after its deadline while someone is there."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Room",
+      "initiate_flow": {
+        "user": "Add room"
+      },
+      "abort": {
+        "reconfigure_successful": "Room updated."
+      },
+      "error": {
+        "area_already_configured": "This area already has a room.",
+        "proxy_with_occupancy": "Use either the room's own sensors or the sensors of other rooms, not both.",
+        "vacuum_less_than_full": "Vacuum passes include the vacuum and mop passes: they cannot be fewer."
+      },
+      "step": {
+        "user": {
+          "title": "Add room",
+          "description": "The area must be mapped to the robot's rooms (vacuum entity settings, \"Areas\").",
+          "data": {
+            "area": "Area",
+            "occupancy_sensors": "Presence sensors in this room",
+            "proxy_sensors": "Presence sensors in other rooms",
+            "empty_minutes": "Minutes empty before cleaning",
+            "full_per_day": "Vacuum and mop passes per day",
+            "vacuum_per_day": "Vacuum passes per day",
+            "min_gap_hours": "Minimum hours between two passes",
+            "full_deadline": "Deadline for vacuum and mop",
+            "vacuum_deadline": "Deadline for vacuum",
+            "clean_action": "Custom clean action (optional)"
+          },
+          "data_description": {
+            "proxy_sensors": "For rooms without their own sensor: the room counts as free while one of these sensors detects someone elsewhere.",
+            "vacuum_per_day": "A vacuum and mop pass counts as a vacuum pass too.",
+            "full_deadline": "After this time the room is cleaned even if someone is there, with the quiet fan speed. Leave empty to never force it.",
+            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity."
+          }
+        },
+        "reconfigure": {
+          "title": "Edit room",
+          "data": {
+            "area": "Area",
+            "occupancy_sensors": "Presence sensors in this room",
+            "proxy_sensors": "Presence sensors in other rooms",
+            "empty_minutes": "Minutes empty before cleaning",
+            "full_per_day": "Vacuum and mop passes per day",
+            "vacuum_per_day": "Vacuum passes per day",
+            "min_gap_hours": "Minimum hours between two passes",
+            "full_deadline": "Deadline for vacuum and mop",
+            "vacuum_deadline": "Deadline for vacuum",
+            "clean_action": "Custom clean action (optional)"
+          },
+          "data_description": {
+            "proxy_sensors": "For rooms without their own sensor: the room counts as free while one of these sensors detects someone elsewhere.",
+            "vacuum_per_day": "A vacuum and mop pass counts as a vacuum pass too.",
+            "full_deadline": "After this time the room is cleaned even if someone is there, with the quiet fan speed. Leave empty to never force it.",
+            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity."
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "weekday": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "job": {
+        "name": "Job",
+        "state": {
+          "idle": "Idle",
+          "starting": "Starting",
+          "running": "Cleaning",
+          "finishing": "Finishing"
+        }
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "disabled": "Disabled",
+          "done": "Done for today",
+          "waiting_gap": "Next pass later",
+          "waiting_occupied": "Waiting for the room to be empty",
+          "waiting_quiet_hours": "Quiet hours",
+          "waiting_awake": "Waiting for wake-up",
+          "waiting_robot": "Waiting for the robot",
+          "ready": "Ready",
+          "cleaning": "Cleaning"
+        }
+      },
+      "last_full": {
+        "name": "Last vacuum and mop"
+      },
+      "last_vacuum": {
+        "name": "Last vacuum"
+      }
+    },
+    "switch": {
+      "enabled": {
+        "name": "Automatic cleaning"
+      },
+      "room_enabled": {
+        "name": "Automatic cleaning"
+      }
+    },
+    "button": {
+      "clean_now_full": {
+        "name": "Vacuum and mop now"
+      },
+      "clean_now_vacuum": {
+        "name": "Vacuum now"
+      }
+    }
+  },
+  "exceptions": {
+    "robot_busy": {
+      "message": "The robot is already cleaning a room."
+    }
+  }
+}

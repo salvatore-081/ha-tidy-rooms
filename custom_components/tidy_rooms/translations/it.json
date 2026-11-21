@@ -1,0 +1,186 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Questo robot aspirapolvere è già gestito da Tidy Rooms."
+    },
+    "step": {
+      "user": {
+        "title": "Tidy Rooms",
+        "description": "Scegli il robot aspirapolvere. Poi aggiungi le stanze dalla pagina dell'integrazione.",
+        "data": {
+          "vacuum": "Robot aspirapolvere"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Orari",
+        "data": {
+          "quiet_start": "Inizio delle ore di silenzio",
+          "quiet_end": "Fine delle ore di silenzio",
+          "wake_sensors": "Sensori del risveglio",
+          "wake_minutes": "Minuti di presenza per considerarvi svegli",
+          "wake_days": "Giorni con il controllo del risveglio",
+          "min_battery": "Batteria minima per partire",
+          "work_mode_entity": "Selettore della modalità di lavoro (facoltativo)",
+          "start_timeout": "Minuti di attesa della partenza prima di riprovare",
+          "job_done_delay": "Minuti in base prima di considerare finita la pulizia",
+          "battery_entity": "Sensore della batteria (facoltativo)",
+          "finished_event": "Evento di fine pulizia (facoltativo)",
+          "job_entity": "Sensore della pulizia in corso (consigliato)"
+        },
+        "data_description": {
+          "quiet_start": "Nessuna pulizia fra inizio e fine, nemmeno dopo un'ora limite.",
+          "wake_sensors": "Nei giorni scelti le pulizie partono solo dopo che uno di questi sensori ha rilevato qualcuno per i minuti indicati (per esempio la colazione in cucina). Lascia vuoto per non fare il controllo.",
+          "work_mode_entity": "Un'entità select del robot che passa fra solo aspirazione e aspirazione con lavaggio.",
+          "job_done_delay": "Usato solo senza il sensore della pulizia in corso. I robot che lavano il mocio tornano in base durante la pulizia: la pulizia è finita solo dopo che il robot resta in base per questo tempo. Anche un rientro per ricaricare conta come fine.",
+          "battery_entity": "Per i robot che indicano la batteria in un sensore a parte.",
+          "finished_event": "Un'entità evento del robot che scatta a fine pulizia. I tipi finished e finished_with_warnings segnano subito la pulizia come fatta; gli altri tipi come interrotta.",
+          "job_entity": "Un sensore binario del robot acceso dall'inizio alla fine di una pulizia, anche quando il robot è in base a metà lavoro. Se impostato decide quando una pulizia è finita, e una pulizia avviata altrove (app, programmazione) tiene occupato il robot."
+        }
+      },
+      "robot": {
+        "title": "Impostazioni del robot",
+        "data": {
+          "normal_fan_speed": "Potenza normale",
+          "quiet_fan_speed": "Potenza silenziosa",
+          "full_mode_option": "Modalità per aspirazione e lavaggio",
+          "vacuum_mode_option": "Modalità per sola aspirazione"
+        },
+        "data_description": {
+          "quiet_fan_speed": "Usata solo quando una stanza va pulita dopo l'ora limite mentre c'è qualcuno."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Stanza",
+      "initiate_flow": {
+        "user": "Aggiungi stanza"
+      },
+      "abort": {
+        "reconfigure_successful": "Stanza aggiornata."
+      },
+      "error": {
+        "area_already_configured": "Quest'area ha già una stanza.",
+        "proxy_with_occupancy": "Usa i sensori della stanza oppure quelli di altre stanze, non entrambi.",
+        "vacuum_less_than_full": "Le aspirazioni comprendono i lavaggi: non possono essere di meno."
+      },
+      "step": {
+        "user": {
+          "title": "Aggiungi stanza",
+          "description": "L'area deve corrispondere alle stanze del robot (impostazioni dell'entità aspirapolvere, \"Aree\").",
+          "data": {
+            "area": "Area",
+            "occupancy_sensors": "Sensori di presenza in questa stanza",
+            "proxy_sensors": "Sensori di presenza in altre stanze",
+            "empty_minutes": "Minuti di stanza vuota prima di pulire",
+            "full_per_day": "Aspirazioni con lavaggio al giorno",
+            "vacuum_per_day": "Aspirazioni al giorno",
+            "min_gap_hours": "Ore minime fra due passate",
+            "full_deadline": "Ora limite per aspirazione e lavaggio",
+            "vacuum_deadline": "Ora limite per l'aspirazione",
+            "clean_action": "Azione di pulizia personalizzata (facoltativa)"
+          },
+          "data_description": {
+            "proxy_sensors": "Per le stanze senza un sensore proprio: la stanza è libera mentre uno di questi sensori rileva qualcuno altrove.",
+            "vacuum_per_day": "Un'aspirazione con lavaggio vale anche come aspirazione.",
+            "full_deadline": "Dopo quest'ora la stanza viene pulita anche se c'è qualcuno, con la potenza silenziosa. Lascia vuoto per non forzarla mai.",
+            "clean_action": "Sostituisce la pulizia standard per area, per i robot la cui integrazione non la supporta. Variabili: room, area_id, kind (full o vacuum), quiet, vacuum_entity."
+          }
+        },
+        "reconfigure": {
+          "title": "Modifica stanza",
+          "data": {
+            "area": "Area",
+            "occupancy_sensors": "Sensori di presenza in questa stanza",
+            "proxy_sensors": "Sensori di presenza in altre stanze",
+            "empty_minutes": "Minuti di stanza vuota prima di pulire",
+            "full_per_day": "Aspirazioni con lavaggio al giorno",
+            "vacuum_per_day": "Aspirazioni al giorno",
+            "min_gap_hours": "Ore minime fra due passate",
+            "full_deadline": "Ora limite per aspirazione e lavaggio",
+            "vacuum_deadline": "Ora limite per l'aspirazione",
+            "clean_action": "Azione di pulizia personalizzata (facoltativa)"
+          },
+          "data_description": {
+            "proxy_sensors": "Per le stanze senza un sensore proprio: la stanza è libera mentre uno di questi sensori rileva qualcuno altrove.",
+            "vacuum_per_day": "Un'aspirazione con lavaggio vale anche come aspirazione.",
+            "full_deadline": "Dopo quest'ora la stanza viene pulita anche se c'è qualcuno, con la potenza silenziosa. Lascia vuoto per non forzarla mai.",
+            "clean_action": "Sostituisce la pulizia standard per area, per i robot la cui integrazione non la supporta. Variabili: room, area_id, kind (full o vacuum), quiet, vacuum_entity."
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "weekday": {
+      "options": {
+        "mon": "Lunedì",
+        "tue": "Martedì",
+        "wed": "Mercoledì",
+        "thu": "Giovedì",
+        "fri": "Venerdì",
+        "sat": "Sabato",
+        "sun": "Domenica"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "job": {
+        "name": "Pulizia in corso",
+        "state": {
+          "idle": "Inattivo",
+          "starting": "In partenza",
+          "running": "In pulizia",
+          "finishing": "In chiusura"
+        }
+      },
+      "status": {
+        "name": "Stato",
+        "state": {
+          "disabled": "Disattivata",
+          "done": "Fatto per oggi",
+          "waiting_gap": "Prossima passata più tardi",
+          "waiting_occupied": "In attesa che la stanza sia vuota",
+          "waiting_quiet_hours": "Ore di silenzio",
+          "waiting_awake": "In attesa del risveglio",
+          "waiting_robot": "In attesa del robot",
+          "ready": "Pronta",
+          "cleaning": "In pulizia"
+        }
+      },
+      "last_full": {
+        "name": "Ultima aspirazione con lavaggio"
+      },
+      "last_vacuum": {
+        "name": "Ultima aspirazione"
+      }
+    },
+    "switch": {
+      "enabled": {
+        "name": "Pulizia automatica"
+      },
+      "room_enabled": {
+        "name": "Pulizia automatica"
+      }
+    },
+    "button": {
+      "clean_now_full": {
+        "name": "Aspira e lava ora"
+      },
+      "clean_now_vacuum": {
+        "name": "Aspira ora"
+      }
+    }
+  },
+  "exceptions": {
+    "robot_busy": {
+      "message": "Il robot sta già pulendo una stanza."
+    }
+  }
+}
