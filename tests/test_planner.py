@@ -616,3 +616,11 @@ def test_manual_target_any_mode() -> None:
     cfg = room(PassConfig("a", "mop_after_vacuum"), PassConfig("b", "vacuum"))
     target = manual_target(cfg, RoomState(), at(10), None, any_mode=True)
     assert target is not None and target.pass_id == "a"
+
+
+def test_outlook_not_before_ignores_presence() -> None:
+    """The end of the gap, even when the room is occupied until the deadline."""
+    st = RoomState(occupied=True, done_today=done("full-1", at_=at(15)), last_clean=at(15))
+    ol = outlook(at(16), G, legacy_room(min_gap_hours=2), st)
+    assert ol.earliest == at(21, 30) and ol.reason is WaitReason.OCCUPIED
+    assert ol.not_before == at(17)

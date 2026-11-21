@@ -122,8 +122,12 @@ export const minutesSince = (iso: string | null | undefined, now: Date): number 
 
 export type Tone = "success" | "active" | "ready" | "waiting" | "warning" | "error" | "off";
 
+/** Done because nothing is planned today (no program, or not on this day). */
+const nothingToday = (room: RoomSnapshot) => room.status === "done" && room.outlook.total === 0;
+
 export const statusIcon = (room: RoomSnapshot): string => {
   if (room.action_error) return "mdi:alert-circle-outline";
+  if (nothingToday(room)) return "mdi:calendar-blank-outline";
   const icons: Record<RoomStatus, string> = {
     disabled: "mdi:pause-circle-outline",
     done: "mdi:check-circle-outline",
@@ -141,6 +145,7 @@ export const statusIcon = (room: RoomSnapshot): string => {
 
 export const statusTone = (room: RoomSnapshot): Tone => {
   if (room.action_error) return "error";
+  if (nothingToday(room)) return "off";
   switch (room.status) {
     case "done":
       return "success";
@@ -159,7 +164,11 @@ export const statusTone = (room: RoomSnapshot): Tone => {
 };
 
 export const statusLabel = (room: RoomSnapshot, t: Localize): string =>
-  room.action_error ? t("status.action_error") : t(`status.${room.status ?? "unknown"}`);
+  room.action_error
+    ? t("status.action_error")
+    : nothingToday(room)
+      ? t("status.nothing_today")
+      : t(`status.${room.status ?? "unknown"}`);
 
 /** Why the robot is not taking a job, if it is not. */
 export const robotBlocker = (snap: LoadedSnapshot, t: Localize, ctx: FormatContext): string => {
@@ -191,9 +200,9 @@ export const waitText = (room: RoomSnapshot, snap: LoadedSnapshot, ctx: FormatCo
     case "disabled":
       return t("wait.disabled");
     case "waiting_window":
-      return t("wait.window", { time: formatTime(ol.earliest, ctx) });
+      return t("wait.window", { time: formatTime(ol.not_before ?? ol.earliest, ctx) });
     case "waiting_gap":
-      return t("wait.gap", { time: formatTime(ol.earliest, ctx) });
+      return t("wait.gap", { time: formatTime(ol.not_before ?? ol.earliest, ctx) });
     case "waiting_quiet_hours":
       return t("wait.quiet_hours", { time: formatClock(snap.quiet_end, ctx) });
     case "waiting_awake":

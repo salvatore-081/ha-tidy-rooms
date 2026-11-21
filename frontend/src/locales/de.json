@@ -22,6 +22,7 @@
   "kind.vacuum": "Saugen",
   "status.cleaning": "Reinigt",
   "status.done": "Für heute erledigt",
+  "status.nothing_today": "Heute nichts",
   "status.ready": "Bereit",
   "status.waiting_gap": "Nächster Durchgang später",
   "status.waiting_occupied": "Wartet, bis der Raum leer ist",

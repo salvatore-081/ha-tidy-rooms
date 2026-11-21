@@ -52,6 +52,7 @@ export const room = (over: Partial<RoomSnapshot> = {}): RoomSnapshot => ({
     free_at: "2026-01-12T10:06:00+01:00",
     deadline: "2026-01-12T19:00:00+01:00",
     forced: true,
+    not_before: "2026-01-12T10:00:00+01:00",
   },
   ...over,
 });

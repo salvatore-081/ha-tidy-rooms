@@ -22,6 +22,14 @@ export const passErrors = (
   );
 };
 
+/** Times without seconds: a pass works to the minute. */
+export const withoutSeconds = (schema: FormField[]): FormField[] =>
+  schema.map((f) =>
+    f.selector && "time" in f.selector
+      ? { ...f, selector: { time: { ...(f.selector.time as object), no_second: true } } }
+      : f,
+  );
+
 /** "Vacuum · until 19:00 · Mon, Tue": one line for a pass being edited. */
 export const passSummary = (p: PassData, ctx: FormatContext): string => {
   const { t } = ctx;
@@ -68,11 +76,25 @@ export class TrProgramEditor extends LitElement {
       .pass.error {
         border-color: var(--error-color, #db4437);
       }
+      summary {
+        list-style: none;
+        cursor: pointer;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
       .head {
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 8px 0 16px;
+        padding: 4px 8px 4px 16px;
+      }
+      .head .chevron {
+        color: var(--tr-muted);
+        transition: transform 0.15s;
+      }
+      details[open] .head .chevron {
+        transform: rotate(90deg);
       }
       .head .n {
         font-weight: 500;
@@ -126,8 +148,11 @@ export class TrProgramEditor extends LitElement {
     const cb = formCallbacks(t);
     const errors = passErrors(this.errors, i);
     const n = i + 1;
-    return html`<div class="pass ${Object.keys(errors).length ? "error" : ""}">
-      <div class="head">
+    const failed = Object.keys(errors).length > 0;
+    // Closed by default; open when new or wrong (the user's toggles are kept).
+    return html`<details class="pass ${failed ? "error" : ""}" ?open=${failed || !p.id}>
+      <summary class="head">
+        <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
         <span class="n">${t("program.pass_n", { n })}</span>
         <span class="summary">${passSummary(p, this.ctx)}</span>
         <button
@@ -135,7 +160,7 @@ export class TrProgramEditor extends LitElement {
           ?disabled=${this.disabled || i === 0}
           aria-label=${t("program.move_up", { n })}
           title=${t("program.move_up", { n })}
-          @click=${() => this._move(i, -1)}
+          @click=${(ev: Event) => this._move(ev, i, -1)}
         >
           <ha-icon icon="mdi:chevron-up"></ha-icon>
         </button>
@@ -144,7 +169,7 @@ export class TrProgramEditor extends LitElement {
           ?disabled=${this.disabled || i === this.passes.length - 1}
           aria-label=${t("program.move_down", { n })}
           title=${t("program.move_down", { n })}
-          @click=${() => this._move(i, 1)}
+          @click=${(ev: Event) => this._move(ev, i, 1)}
         >
           <ha-icon icon="mdi:chevron-down"></ha-icon>
         </button>
@@ -153,16 +178,16 @@ export class TrProgramEditor extends LitElement {
           ?disabled=${this.disabled}
           aria-label=${t("program.remove", { n })}
           title=${t("program.remove", { n })}
-          @click=${() => this._remove(i)}
+          @click=${(ev: Event) => this._remove(ev, i)}
         >
           <ha-icon icon="mdi:delete-outline"></ha-icon>
         </button>
-      </div>
+      </summary>
       <div class="body">
         <ha-form
           .hass=${this.hass}
           .data=${p}
-          .schema=${this.schema}
+          .schema=${withoutSeconds(this.schema)}
           .error=${errors}
           .computeLabel=${cb.computeLabel}
           .computeHelper=${cb.computeHelper}
@@ -173,7 +198,7 @@ export class TrProgramEditor extends LitElement {
             this._changed(i, ev.detail.value)}
         ></ha-form>
       </div>
-    </div>`;
+    </details>`;
   }
 
   private _emit(passes: PassData[]) {
@@ -195,14 +220,16 @@ export class TrProgramEditor extends LitElement {
     this._emit([...this.passes, pass]);
   }
 
-  private _move(index: number, delta: number) {
+  private _move(ev: Event, index: number, delta: number) {
+    ev.preventDefault(); // a button in the summary must not toggle the pass
     const passes = [...this.passes];
     const [moved] = passes.splice(index, 1);
     passes.splice(index + delta, 0, moved);
     this._emit(passes);
   }
 
-  private async _remove(index: number) {
+  private async _remove(ev: Event, index: number) {
+    ev.preventDefault();
     const { t } = this.ctx;
     const ok = await confirmDialog(this.renderRoot as ShadowRoot, {
       title: t("program.remove_title", { n: index + 1 }),

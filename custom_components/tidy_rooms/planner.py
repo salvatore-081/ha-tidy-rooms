@@ -458,6 +458,8 @@ class RoomOutlook:
     free_at: datetime | None  # when the room counts as empty, if it stays so
     deadline: datetime | None  # when the pass is forced (or skipped)
     forced: bool  # the pass is forced at its deadline
+    # When the window, the gap and quiet hours allow it, presence aside.
+    not_before: datetime | None = None
 
 
 def _after_quiet(moment: datetime, gcfg: GlobalConfig) -> datetime:
@@ -495,6 +497,8 @@ def outlook(
     position = sum(1 for s in statuses[: i + 1] if s is not PassStatus.NOT_TODAY)
     deadline = _at(now, p.end) if p.end is not None else None
 
+    start = now
+
     def result(
         earliest: datetime | None, reason: WaitReason | None, free_at: datetime | None
     ) -> RoomOutlook:
@@ -510,6 +514,7 @@ def outlook(
             free_at,
             deadline,
             p.is_forced,
+            start,
         )
 
     # Time constraints: start of the window, minimum gap, quiet hours.

@@ -22,6 +22,7 @@
   "kind.vacuum": "Aspirar",
   "status.cleaning": "Limpiando",
   "status.done": "Hecho por hoy",
+  "status.nothing_today": "Nada hoy",
   "status.ready": "Lista",
   "status.waiting_gap": "Próxima pasada más tarde",
   "status.waiting_occupied": "Esperando a que la habitación esté vacía",

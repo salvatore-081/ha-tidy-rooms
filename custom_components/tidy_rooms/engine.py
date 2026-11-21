@@ -1238,5 +1238,6 @@ class TidyRoomsEngine:
                 "free_at": _iso(ol.free_at),
                 "deadline": _iso(ol.deadline),
                 "forced": ol.forced,
+                "not_before": _iso(ol.not_before),
             },
         }

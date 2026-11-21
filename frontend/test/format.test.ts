@@ -10,6 +10,8 @@ import {
   manualTarget,
   outlookText,
   passWindow,
+  statusLabel,
+  statusTone,
   waitText,
 } from "../src/format";
 import { localizer } from "../src/localize";
@@ -53,12 +55,17 @@ describe("room texts", () => {
       done: 1,
       work_mode: "vacuum",
       earliest: "2026-01-12T16:00:00+01:00",
+      not_before: "2026-01-12T16:00:00+01:00",
       reason: "gap",
     };
     expect(waitText(r, snapshot(), ctx)).toBe("Prossima passata dalle 16:00 (distanza minima).");
     expect(outlookText(r, ctx)).toBe("Aspirazione (2/2) dalle 16:00");
     r.status = "waiting_window";
     expect(waitText(r, snapshot(), ctx)).toBe("Prossima passata dalle 16:00.");
+    // Occupied: the start is the deadline, the gap still ends at 16:00.
+    r.outlook = { ...r.outlook, earliest: "2026-01-12T21:30:00+01:00", reason: "occupied" };
+    r.status = "waiting_gap";
+    expect(waitText(r, snapshot(), ctx)).toBe("Prossima passata dalle 16:00 (distanza minima).");
   });
 
   it("does not promise a start while automatic cleaning is paused", () => {
@@ -100,6 +107,8 @@ describe("room texts", () => {
     done.outlook = { ...done.outlook, total: 0, done: 0, skipped: 0 };
     expect(outlookText(done, ctx)).toBe("Niente in programma oggi");
     expect(waitText(done, snapshot(), ctx)).toBe("Nessuna passata prevista oggi.");
+    expect(statusLabel(done, localizer("it"))).toBe("Niente oggi");
+    expect(statusTone(done)).toBe("off");
     const late = room();
     late.outlook = { ...late.outlook, total: 1, earliest: null, reason: "not_today" };
     expect(outlookText(late, ctx)).toBe("Aspirazione poi lavaggio: non prima di domani");

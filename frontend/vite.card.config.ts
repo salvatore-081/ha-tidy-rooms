@@ -13,6 +13,9 @@ const CARD_KEY_PREFIXES = [
   "robot.",
   "time.",
   "job.",
+  "mode.",
+  "pass.",
+  "pass_status.",
 ];
 
 function cardLocales(): Plugin {

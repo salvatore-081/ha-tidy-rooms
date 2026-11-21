@@ -22,6 +22,7 @@
   "kind.vacuum": "Vacuum",
   "status.cleaning": "Cleaning",
   "status.done": "Done for today",
+  "status.nothing_today": "Nothing today",
   "status.ready": "Ready",
   "status.waiting_gap": "Next pass later",
   "status.waiting_occupied": "Waiting for the room to be empty",

@@ -43,6 +43,8 @@ export interface Outlook {
   free_at: string | null;
   deadline: string | null;
   forced: boolean;
+  /** When the window, the gap and quiet hours allow the pass, presence aside. */
+  not_before: string | null;
 }
 
 /** A pass of a room's program, with where it stands today. */
