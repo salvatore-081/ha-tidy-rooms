@@ -2,23 +2,25 @@
 
 A Home Assistant integration that cleans each room **when nobody is in it**, while making sure every room still gets its daily cleaning.
 
-Instead of fixed schedules, you set targets per room (for example *one vacuum and mop pass and two vacuum passes a day, at least 6 hours apart*). Tidy Rooms watches your presence sensors and sends the robot to a room as soon as it has been empty for a while. If a room never empties, it is cleaned anyway after a deadline you choose, with the quiet fan speed.
+Instead of fixed schedules, each room has a **cleaning program**: the passes of a day, in order, each with its own work mode and window (for example *vacuum then mop by 12:00; vacuum from 17:00, at least 6 hours later, by 20:30; mop at the weekend*). Tidy Rooms watches your presence sensors and sends the robot to a room as soon as it has been empty for a while, planning the whole house together. If a room never empties, it is cleaned anyway at the deadline you choose, with the quiet fan speed.
 
 > **Status: early development.** The rules and the integration are covered by automated tests, but they have not yet driven a robot in a real home. Feedback and issues are welcome.
 
 ## How it works
 
 - **One room at a time.** The robot gets a single room per job, so the plan can change between rooms.
-- **Daily targets per room**: vacuum and mop passes, vacuum passes (a vacuum and mop pass counts as one), and the minimum gap between two passes.
+- **A program per room**: up to 6 passes, each with its work mode, fan speed, window ("not before" and deadline), days of the week, minimum gap since the last cleaning of the room, and whether it is forced at the deadline.
+- **Passes in order**: a pass waits for the earlier ones while their window is open or still to come. A pass whose window closes without a cleaning is skipped and does not block the next ones; when a later pass starts, the earlier ones still pending are skipped. If the minimum gap ends after the deadline, the pass is skipped.
 - **Empty rooms only**: a room is cleaned after its presence sensors have reported nobody for the configured minutes. Rooms without a sensor can use the sensors of other rooms instead ("free while someone is detected elsewhere"), or have no condition at all.
 - **Someone walks in**: the robot is sent back to the dock and the room stays due.
-- **Deadlines**: after the deadline the room is cleaned even if occupied, with the quiet fan speed, and the job is not interrupted.
-- **Quiet hours**: no cleaning at night, not even after a deadline.
+- **Deadlines**: at the deadline a forced pass is cleaned even if the room is occupied, with the quiet fan speed, and the job is not interrupted; a pass that is not forced is skipped.
+- **Do not disturb**: the robot never starts in these hours, not even for a forced pass; passes without a "not before" time start at their end.
 - **Wake-up check** (optional): on the days you choose (weekends, by default), cleaning starts only after someone has been detected for a while by the wake-up sensors, for example in the kitchen at breakfast.
 - **Robots that do not answer**: if the robot does not start within a few minutes, the command is sent again; after three attempts Tidy Rooms waits 15 minutes.
+- **Robot settings put back** (optional): at the end of its jobs Tidy Rooms gives the robot back the work mode and fan speed it had before, so a cleaning started from the robot's app does not inherit them. A setting changed by someone else meanwhile is left alone.
 - **When a job is over**: best with a *cleaning job sensor*, a binary sensor of the robot that stays on for the whole job, also while the robot is back at the dock to empty the dustbin, wash the mop or recharge (for example the *Cleaning job* sensor of the patched Ecovacs integration for the T90 PRO OMNI). Without it, a job counts as done when the robot stays docked for a configurable time, which also treats a return to recharge as the end; a "job finished" event entity, if the robot has one, ends it right away.
 
-Priority when several rooms are due: forced (past the deadline) first, then vacuum and mop passes, then the room that has waited longest.
+Priority when several rooms are due: forced passes (past the deadline) first, then the nearest deadline, then the room that has waited longest, then the room order.
 
 ## Requirements
 
@@ -30,10 +32,10 @@ Priority when several rooms are due: forced (past the deadline) first, then vacu
 
 Tidy Rooms adds a **Tidy Rooms** panel to the sidebar (administrators only), in English, Italian, German, Spanish and French:
 
-- **Overview**: the robot (state, battery, automatic cleaning on or off, the job in progress, the next room), then a tile per room with its status, why it is waiting (for example *empty for 4 of 10 min*, *next pass from 15:20*), today's passes against the targets, the last pass and an estimate of the next one. Buttons clean a room right away.
-- **Rooms**: the rooms in priority order (the order breaks ties when several rooms could be cleaned), to reorder, skip, add, edit or delete. A room page shows its live status and its recent jobs next to the form. A room can have its own fan speed and work modes; empty fields use the global settings.
-- **History**: the jobs of the last 7 or 30 days, with their result (done, interrupted, failed, stopped) and a summary per room.
-- **Settings**: quiet hours, wake-up check, how to drive the robot and how to tell that a job is over.
+- **Overview**: the robot (state, battery, automatic cleaning on or off, the job in progress, the next room), then a tile per room with its status, why it is waiting (for example *empty for 4 of 10 min*, *next pass from 15:20*), a dot per pass of today (done, skipped, to do), the day's timeline (pass windows, cleanings done, do not disturb, now), the last cleaning and an estimate of the next pass (*Vacuum (2/3) from 16:20*). **Clean now** starts a room right away, with a choice of the robot's work modes: the cleaning counts as today's first pass with that work mode, otherwise it is logged and does not count.
+- **Rooms**: the rooms in priority order (the order breaks ties when several rooms could be cleaned), to reorder, skip, add, edit or delete. A room page shows its live status and its recent jobs next to the form and the editor of its cleaning program (add, reorder, remove passes).
+- **History**: the jobs of the last 7 or 30 days, with their work mode and result (done, interrupted, failed, stopped) and a summary per room.
+- **Settings**: do not disturb, wake-up check, how to drive the robot and how to tell that a job is over.
 
 Times in the panel are estimates: a room that is empty now may be occupied in ten minutes.
 
@@ -67,11 +69,12 @@ Download `tidy_rooms.zip` from the latest release, unpack it into `config/custom
 ## Configuration
 
 1. **Settings → Devices & services → Add integration → Tidy Rooms**, then choose the robot vacuum.
-2. In the **Tidy Rooms** panel, **Rooms → Add room** for each room: area, presence sensors, targets and deadlines.
-3. **Settings** in the panel for quiet hours, wake-up check, minimum battery and how to drive the robot: the work mode select entity, which of its options to use for the vacuum and mop passes and for the vacuum passes, the fan speed of the cleanings and the one used while someone is in the room. Each menu offers all the robot's options.
-4. Optionally, per room (**Rooms → room → Robot**): its own fan speed and work modes. The quiet speed still wins when a room is cleaned after its deadline while someone is there.
+2. **Settings** in the panel for do not disturb, wake-up check and how to drive the robot: minimum battery, the work mode select entity (its options are offered to each pass), the fan speed of the passes without their own and the one used while someone is in the room. Each menu offers all the robot's options.
+3. In the **Tidy Rooms** panel, **Rooms → Add room** for each room: area, presence sensors and its cleaning program. A pass without a work mode leaves the robot's mode as it is; one without a fan speed uses the one of the settings. The quiet speed still wins when a pass is cleaned after its deadline while someone is there.
 
-Rooms and settings can also be managed from the integration page (**Add room**, **Configure**): both edit the same configuration.
+Rooms and settings can also be managed from the integration page (**Add room**, **Configure**): both edit the same configuration, except the cleaning programs, which are edited in the panel (a room added there starts with an empty program).
+
+Updating from 0.3.0: each room gets the program equivalent to its daily targets and deadlines on the first start.
 
 ## Entities
 
@@ -79,21 +82,22 @@ For the whole robot:
 
 | Entity | Description |
 |---|---|
-| `sensor.…_job` | `idle`, `starting`, `running`, `finishing`; attributes: room, kind, forced, quiet |
+| `sensor.…_job` | `idle`, `starting`, `running`, `finishing`; attributes: room, work mode, whether it counts as a pass, forced, quiet |
 | `switch.…_automatic_cleaning` | Pauses automatic cleaning (a running job is not stopped) |
 
 For each room (one device per room, in the room's area):
 
 | Entity | Description |
 |---|---|
-| `sensor.…_status` | `done`, `ready`, `cleaning`, `waiting_occupied`, `waiting_gap`, `waiting_quiet_hours`, `waiting_awake`, `waiting_robot`, `disabled`; attributes: today's passes and targets, last result |
-| `sensor.…_last_vacuum_and_mop`, `sensor.…_last_vacuum` | When the room last got each kind of pass |
+| `sensor.…_status` | `done`, `ready`, `cleaning`, `waiting_occupied`, `waiting_window`, `waiting_gap`, `waiting_quiet_hours` (do not disturb), `waiting_awake`, `waiting_robot`, `disabled`; attributes: passes done and planned today, next pass and when it can start, last result |
+| `sensor.…_passes_today` | Passes of today's program done; attributes: `total`, `skipped` |
+| `sensor.…_last_cleaning` | When the room last got a pass of its program |
 | `switch.…_automatic_cleaning` | Skips the room |
-| `button.…_vacuum_and_mop_now`, `button.…_vacuum_now` | Cleans the room now, even if occupied; counts towards today's targets |
+| `button.…_clean_now_‹work mode›` | One per work mode of the robot (one `…_clean_now` without a work mode select): cleans the room now, even if occupied; counts as today's first pass with that work mode |
 
 ## Custom clean action
 
-Some robot integrations expose area cleaning but the robot rejects the command. For these, each room can have a **custom clean action** that replaces `vacuum.clean_area`. Work mode and fan speed are still set by Tidy Rooms before the action runs. Available variables: `room`, `area_id`, `kind` (`full` or `vacuum`), `quiet`, `vacuum_entity`.
+Some robot integrations expose area cleaning but the robot rejects the command. For these, each room can have a **custom clean action** that replaces `vacuum.clean_area`. Work mode and fan speed are still set by Tidy Rooms before the action runs. Available variables: `room`, `area_id`, `work_mode` (empty when the pass leaves the robot's mode as it is), `pass_id` (empty for a manual cleaning that does not count), `quiet`, `vacuum_entity`.
 
 Example for Ecovacs robots that need `clean_V2` (room id `2` in the Ecovacs app map):
 
