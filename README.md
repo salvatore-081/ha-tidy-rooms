@@ -134,6 +134,10 @@ npm run build
 
 The panel talks to the integration through its WebSocket API (`websocket_api.py`, commands `tidy_rooms/*`); the forms are the integration's own schemas, shown with Home Assistant's `ha-form`.
 
+## Acknowledgements
+
+The panel and its release follow the model of [RoomMind](https://github.com/snazzybean/roommind) (MIT, Copyright (c) 2026 SnazzyBean): a sidebar panel and a dashboard card registered by the integration itself, a Lit frontend bundled with Vite and shipped in the release zip built by CI. Two small pieces are adapted from its code: loading Home Assistant's `ha-form` in a panel opened directly (`frontend/src/load-ha-elements.ts`; RoomMind credits the technique to alarmo and scheduler-card) and the filter that keeps only the card's strings in its bundle (`frontend/vite.card.config.ts`).
+
 ## License
 
 MIT

@@ -1,6 +1,10 @@
 // Home Assistant loads its own elements lazily. A custom panel opened directly
 // (a bookmark, a reload) may find <ha-form> undefined: these helpers load it
 // the way other custom panels do, through the modules of built-in panels.
+//
+// Adapted from RoomMind (https://github.com/snazzybean/roommind, MIT,
+// Copyright (c) 2026 SnazzyBean), which credits the technique to alarmo and
+// scheduler-card.
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- frontend internals are untyped */
 
