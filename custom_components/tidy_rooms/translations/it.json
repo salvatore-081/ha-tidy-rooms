@@ -45,7 +45,7 @@
         "title": "Impostazioni del robot",
         "data": {
           "normal_fan_speed": "Potenza delle passate senza una propria",
-          "quiet_fan_speed": "Velocità della ventola con qualcuno nella stanza",
+          "quiet_fan_speed": "Velocità d'aspirazione con qualcuno nella stanza",
           "restore_settings": "Rimetti le impostazioni del robot dopo ogni lavoro"
         },
         "data_description": {
