@@ -37,6 +37,7 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_track_state_change_event,
@@ -1149,6 +1150,8 @@ class TidyRoomsEngine:
                 "idle": robot.idle,
                 "battery": robot.battery,
                 "fan_speed": vac.attributes.get("fan_speed") if vac else None,
+                "features": int(vac.attributes.get("supported_features", 0)) if vac else 0,
+                "buttons": self.robot_buttons(),
             },
             "job": {
                 "room_id": job.decision.room_id,
@@ -1170,6 +1173,24 @@ class TidyRoomsEngine:
                 for room_id, r in self.rooms.items()
             ],
         }
+
+    def robot_buttons(self) -> list[str]:
+        """Button entities of the robot's own device (empty the dustbin, wash the mop…).
+
+        Disabled and hidden ones are left out, and so are Tidy Rooms' own.
+        """
+        registry = er.async_get(self.hass)
+        vacuum = registry.async_get(self.vacuum_entity)
+        if vacuum is None or vacuum.device_id is None:
+            return []
+        return sorted(
+            e.entity_id
+            for e in er.async_entries_for_device(registry, vacuum.device_id)
+            if e.domain == "button"
+            and e.platform != DOMAIN
+            and e.disabled_by is None
+            and e.hidden_by is None
+        )
 
     def pass_states(self, room: Room, now: datetime) -> list[PassStatus]:
         """Today's status of each pass of a room (the running job included)."""

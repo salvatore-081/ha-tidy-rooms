@@ -83,6 +83,8 @@ export const snapshot = (over: Partial<LoadedSnapshot> = {}): LoadedSnapshot => 
     idle: true,
     battery: 87,
     fan_speed: "normal",
+    features: 16 | 512,
+    buttons: [],
   },
   job: null,
   next_room: "kitchen",

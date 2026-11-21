@@ -287,3 +287,44 @@ async def test_single_button_without_work_mode_entity(
     assert job is not None and job.decision.pass_id == "full-1"
     assert job.decision.work_mode is None
     assert calls["mode"] == []
+
+
+async def test_robot_buttons_from_its_device(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The panel offers the buttons of the robot's device, not hidden or disabled ones."""
+    from homeassistant.helpers import device_registry as dr
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    robot_entry = MockConfigEntry(domain="ecovacs")
+    robot_entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=robot_entry.entry_id, identifiers={("ecovacs", "robot")}
+    )
+    reg = er.async_get(hass)
+
+    def button(object_id: str, **kw: Any) -> str:
+        return reg.async_get_or_create(
+            "button",
+            "ecovacs",
+            object_id,
+            suggested_object_id=f"robot_{object_id}",
+            device_id=device.id,
+            config_entry=robot_entry,
+            **kw,
+        ).entity_id
+
+    reg.async_get_or_create(
+        "vacuum", "ecovacs", "robot", suggested_object_id="robot", device_id=device.id
+    )
+    empty = button("empty_dustbin")
+    wash = button("wash_mop")
+    button("reset_filter", hidden_by=er.RegistryEntryHider.INTEGRATION)
+    button("reset_brush", disabled_by=er.RegistryEntryDisabler.INTEGRATION)
+    reg.async_get_or_create("button", "other", "x", suggested_object_id="elsewhere")
+
+    entry, _, _ = await make(hass, freezer, room_id=ROOM)
+    assert entry.runtime_data.robot_buttons() == sorted([empty, wash])
+    snap = entry.runtime_data.snapshot()
+    assert snap["robot"]["buttons"] == sorted([empty, wash])
+    assert isinstance(snap["robot"]["features"], int)

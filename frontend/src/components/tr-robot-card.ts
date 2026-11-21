@@ -4,6 +4,8 @@ import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import "./tr-switch";
+import { callAction, errorMessage } from "../api";
+import { notify } from "../nav";
 import {
   type FormatContext,
   formatClock,
@@ -13,6 +15,16 @@ import {
 } from "../format";
 import { shared, tokens } from "../styles";
 import type { HomeAssistant, LoadedSnapshot } from "../types";
+
+// VacuumEntityFeature
+const RETURN_HOME = 16;
+const LOCATE = 512;
+
+/** A button's name without the robot's name in front ("Tatiana Lava il mocio" → "Lava il mocio"). */
+export const buttonName = (friendly: string, robot: string): string => {
+  const rest = friendly.startsWith(`${robot} `) ? friendly.slice(robot.length + 1) : friendly;
+  return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : friendly;
+};
 
 const batteryIcon = (level: number | null): string => {
   if (level === null) return "mdi:battery-unknown";
@@ -78,6 +90,16 @@ export class TrRobotCard extends LitElement {
         align-items: center;
         gap: 10px;
         font-size: 0.9rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 16px 14px;
+      }
+      .actions .btn ha-icon,
+      .actions .btn ha-state-icon {
+        --mdc-icon-size: 18px;
       }
       .lines {
         border-top: 1px solid var(--tr-border);
@@ -165,6 +187,7 @@ export class TrRobotCard extends LitElement {
             ></tr-switch>
           </div>
         </div>
+        ${this.admin ? this._actions() : nothing}
         <div class="lines">${this._job()} ${this._next()} ${this._schedule()}</div>
       </div>
     `;
@@ -256,6 +279,68 @@ export class TrRobotCard extends LitElement {
       <ha-icon icon="mdi:clock-outline"></ha-icon>
       <div class="text secondary">${parts.join(" · ")}</div>
     </div>`;
+  }
+
+  /** The robot's own commands: back to the dock, locate, and the buttons of its device. */
+  private _actions() {
+    const { t } = this.ctx;
+    const robot = this.snapshot.robot;
+    const off = !robot.available;
+    const buttons = robot.buttons
+      .map((id) => this.hass.states[id])
+      .filter((st) => st !== undefined);
+    const home = Boolean(robot.features & RETURN_HOME);
+    const locate = Boolean(robot.features & LOCATE);
+    if (!home && !locate && !buttons.length) return nothing;
+    return html`<div class="actions" role="group" aria-label=${t("robot.actions")}>
+      ${
+        home
+          ? html`<button class="btn" ?disabled=${off} @click=${this._home}>
+              <ha-icon icon="mdi:home-import-outline"></ha-icon>${t("robot.return_home")}
+            </button>`
+          : nothing
+      }
+      ${
+        locate
+          ? html`<button
+              class="btn"
+              ?disabled=${off}
+              @click=${() => this._call("vacuum", "locate", robot.entity_id, t("robot.locate"))}
+            >
+              <ha-icon icon="mdi:map-marker-radius-outline"></ha-icon>${t("robot.locate")}
+            </button>`
+          : nothing
+      }
+      ${buttons.map((st) => {
+        const name = buttonName(String(st.attributes.friendly_name ?? st.entity_id), robot.name);
+        return html`<button
+          class="btn"
+          ?disabled=${off || st.state === "unavailable"}
+          @click=${() => this._call("button", "press", st.entity_id, name)}
+        >
+          <ha-state-icon .hass=${this.hass} .stateObj=${st}></ha-state-icon>${name}
+        </button>`;
+      })}
+    </div>`;
+  }
+
+  private _home() {
+    // A job of Tidy Rooms is stopped through it, so it does not count as done.
+    if (this.snapshot.job) {
+      this._stop();
+      return;
+    }
+    const robot = this.snapshot.robot;
+    this._call("vacuum", "return_to_base", robot.entity_id, this.ctx.t("robot.return_home"));
+  }
+
+  private async _call(domain: string, service: string, entityId: string, label: string) {
+    try {
+      await callAction(this.hass, domain, service, entityId);
+      notify(this, this.ctx.t("robot.sent", { action: label }));
+    } catch (err) {
+      notify(this, errorMessage(err));
+    }
   }
 
   private _toggle(ev: CustomEvent<{ checked: boolean }>) {

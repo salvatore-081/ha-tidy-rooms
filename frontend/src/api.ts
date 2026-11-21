@@ -107,6 +107,20 @@ export const cleanNow = (
 export const stopJob = (hass: HomeAssistant, entryId: string) =>
   hass.callWS<null>({ type: "tidy_rooms/stop_job", entry_id: entryId });
 
+/** Call a Home Assistant action on one entity (robot commands of the panel). */
+export const callAction = (
+  hass: HomeAssistant,
+  domain: string,
+  service: string,
+  entityId: string,
+) =>
+  hass.callWS<unknown>({
+    type: "call_service",
+    domain,
+    service,
+    target: { entity_id: entityId },
+  });
+
 /** The message of an error thrown by callWS. */
 export const errorMessage = (err: unknown): string => {
   if (err && typeof err === "object") {

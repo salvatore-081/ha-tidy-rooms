@@ -107,6 +107,10 @@ export interface RobotSnapshot {
   idle: boolean;
   battery: number | null;
   fan_speed: string | null;
+  /** supported_features of the vacuum entity. */
+  features: number;
+  /** Button entities of the robot's own device (empty the dustbin, wash the mop…). */
+  buttons: string[];
 }
 
 export interface LoadedSnapshot {

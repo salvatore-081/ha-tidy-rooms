@@ -8,6 +8,8 @@ import { passErrors, passSummary, windowInDnd } from "../src/components/tr-progr
 import { quietRanges } from "../src/components/tr-timeline";
 import { formatContext } from "../src/format";
 import { localizer } from "../src/localize";
+import type { HassEntity } from "home-assistant-js-websocket";
+import type { HomeAssistant } from "../src/types";
 import { NOW, hass, pass, room, snapshot } from "./fixtures";
 
 const ctx = formatContext(hass("en"), localizer("en"), NOW, "select.tatiana_work_mode");
@@ -86,6 +88,74 @@ describe("robot card", () => {
     expect(text).toContain("No job running");
     expect(text).toContain("Next: Cucina");
     expect(text).toContain("Do not disturb 22:30–08:00");
+  });
+});
+
+describe("robot commands", () => {
+  it("offers back to the dock, locate and the buttons of the robot's device", async () => {
+    const h = hass("en");
+    const calls: unknown[] = [];
+    h.callWS = (async (msg: unknown) => {
+      calls.push(msg);
+      return null;
+    }) as HomeAssistant["callWS"];
+    h.states["button.tatiana_empty"] = {
+      entity_id: "button.tatiana_empty",
+      state: "unknown",
+      attributes: { friendly_name: "Tatiana Empty the dustbin" },
+    } as unknown as HassEntity;
+    const s = snapshot({
+      robot: { ...snapshot().robot, buttons: ["button.tatiana_empty", "button.missing"] },
+    });
+    const el = document.createElement("tr-robot-card");
+    Object.assign(el, { hass: h, snapshot: s, ctx, admin: true });
+    const root = await mount(el);
+    const buttons = [...root.querySelectorAll(".actions .btn")] as HTMLButtonElement[];
+    expect(buttons.map((b) => b.textContent!.trim())).toEqual([
+      "Back to the dock",
+      "Locate",
+      "Empty the dustbin",
+    ]);
+    buttons[2].click();
+    expect(calls).toEqual([
+      {
+        type: "call_service",
+        domain: "button",
+        service: "press",
+        target: { entity_id: "button.tatiana_empty" },
+      },
+    ]);
+  });
+
+  it("stops a job of Tidy Rooms instead of sending the robot home behind its back", async () => {
+    const s = snapshot({
+      job: {
+        room_id: "kitchen",
+        room: "Cucina",
+        pass_id: "full-1",
+        work_mode: "mop_after_vacuum",
+        forced: false,
+        quiet: false,
+        manual: false,
+        phase: "running",
+        created: "2026-01-12T09:40:00+01:00",
+        attempts: 1,
+      },
+    });
+    const el = document.createElement("tr-robot-card");
+    Object.assign(el, { hass: hass("en"), snapshot: s, ctx, admin: true });
+    const root = await mount(el);
+    let stopped = false;
+    el.addEventListener("stop-job", () => (stopped = true));
+    (root.querySelector(".actions .btn") as HTMLButtonElement).click();
+    expect(stopped).toBe(true);
+  });
+
+  it("has no commands for users who are not admins", async () => {
+    const el = document.createElement("tr-robot-card");
+    Object.assign(el, { hass: hass("en"), snapshot: snapshot(), ctx, admin: false });
+    const root = await mount(el);
+    expect(root.querySelector(".actions")).toBeNull();
   });
 });
 
