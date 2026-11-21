@@ -48,6 +48,18 @@ CONF_ROOM_FAN_SPEED: Final = "fan_speed"
 CONF_ROOM_FULL_MODE: Final = "full_mode"
 CONF_ROOM_VACUUM_MODE: Final = "vacuum_mode"
 
+# Cleaning program of a room: a list of passes
+CONF_PASSES: Final = "passes"
+CONF_PASS_ID: Final = "id"
+CONF_WORK_MODE: Final = "work_mode"
+CONF_FAN_SPEED: Final = "fan_speed"
+CONF_START: Final = "start"
+CONF_END: Final = "end"
+CONF_FORCED: Final = "forced"
+CONF_GAP_HOURS: Final = "gap_hours"
+CONF_DAYS: Final = "days"
+MAX_PASSES: Final = 6
+
 DEFAULT_QUIET_START: Final = "22:30:00"
 DEFAULT_QUIET_END: Final = "08:00:00"
 DEFAULT_MIN_BATTERY: Final = 30
