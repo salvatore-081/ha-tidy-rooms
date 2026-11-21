@@ -31,7 +31,7 @@ Priority when several rooms are due: forced (past the deadline) first, then vacu
 Tidy Rooms adds a **Tidy Rooms** panel to the sidebar (administrators only), in English, Italian, German, Spanish and French:
 
 - **Overview**: the robot (state, battery, automatic cleaning on or off, the job in progress, the next room), then a tile per room with its status, why it is waiting (for example *empty for 4 of 10 min*, *next pass from 15:20*), today's passes against the targets, the last pass and an estimate of the next one. Buttons clean a room right away.
-- **Rooms**: the rooms in priority order (the order breaks ties when several rooms could be cleaned), to reorder, skip, add, edit or delete. A room page shows its live status and its recent jobs next to the form.
+- **Rooms**: the rooms in priority order (the order breaks ties when several rooms could be cleaned), to reorder, skip, add, edit or delete. A room page shows its live status and its recent jobs next to the form. A room can have its own fan speed and work modes; empty fields use the global settings.
 - **History**: the jobs of the last 7 or 30 days, with their result (done, interrupted, failed, stopped) and a summary per room.
 - **Settings**: quiet hours, wake-up check, how to drive the robot and how to tell that a job is over.
 
@@ -68,7 +68,8 @@ Download `tidy_rooms.zip` from the latest release, unpack it into `config/custom
 
 1. **Settings → Devices & services → Add integration → Tidy Rooms**, then choose the robot vacuum.
 2. In the **Tidy Rooms** panel, **Rooms → Add room** for each room: area, presence sensors, targets and deadlines.
-3. **Settings** in the panel for quiet hours, wake-up check, minimum battery and how to drive the robot (work mode select entity and its options for "vacuum and mop" and "vacuum only", normal and quiet fan speeds).
+3. **Settings** in the panel for quiet hours, wake-up check, minimum battery and how to drive the robot: the work mode select entity, which of its options to use for the vacuum and mop passes and for the vacuum passes, the fan speed of the cleanings and the one used while someone is in the room. Each menu offers all the robot's options.
+4. Optionally, per room (**Rooms → room → Robot**): its own fan speed and work modes. The quiet speed still wins when a room is cleaned after its deadline while someone is there.
 
 Rooms and settings can also be managed from the integration page (**Add room**, **Configure**): both edit the same configuration.
 

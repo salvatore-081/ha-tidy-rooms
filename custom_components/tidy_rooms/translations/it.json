@@ -44,14 +44,15 @@
       "robot": {
         "title": "Impostazioni del robot",
         "data": {
-          "normal_fan_speed": "Potenza normale",
-          "quiet_fan_speed": "Potenza silenziosa",
-          "full_mode_option": "Modalità per aspirazione e lavaggio",
-          "vacuum_mode_option": "Modalità per sola aspirazione"
+          "normal_fan_speed": "Velocità della ventola nelle pulizie",
+          "quiet_fan_speed": "Velocità della ventola con qualcuno nella stanza",
+          "full_mode_option": "Modalità del robot per le passate con lavaggio",
+          "vacuum_mode_option": "Modalità del robot per le passate di sola aspirazione"
         },
         "data_description": {
           "quiet_fan_speed": "Usata solo quando una stanza va pulita dopo l'ora limite mentre c'è qualcuno."
-        }
+        },
+        "description": "Ogni menu offre tutte le opzioni del robot. Le stanze possono avere velocità e modalità proprie."
       }
     }
   },
@@ -83,13 +84,19 @@
             "min_gap_hours": "Ore minime fra due passate",
             "full_deadline": "Ora limite per aspirazione e lavaggio",
             "vacuum_deadline": "Ora limite per l'aspirazione",
+            "fan_speed": "Velocità della ventola in questa stanza",
+            "full_mode": "Modalità per aspirazione e lavaggio in questa stanza",
+            "vacuum_mode": "Modalità per la sola aspirazione in questa stanza",
             "clean_action": "Azione di pulizia personalizzata (facoltativa)"
           },
           "data_description": {
             "proxy_sensors": "Per le stanze senza un sensore proprio: la stanza è libera mentre uno di questi sensori rileva qualcuno altrove.",
             "vacuum_per_day": "Un'aspirazione con lavaggio vale anche come aspirazione.",
             "full_deadline": "Dopo quest'ora la stanza viene pulita anche se c'è qualcuno, con la potenza silenziosa. Lascia vuoto per non forzarla mai.",
-            "clean_action": "Sostituisce la pulizia standard per area, per i robot la cui integrazione non la supporta. Variabili: room, area_id, kind (full o vacuum), quiet, vacuum_entity."
+            "clean_action": "Sostituisce la pulizia standard per area, per i robot la cui integrazione non la supporta. Variabili: room, area_id, kind (full o vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Vuoto: la velocità delle impostazioni generali. La velocità silenziosa ha comunque la precedenza quando la stanza si pulisce dopo l'ora limite con qualcuno dentro.",
+            "full_mode": "Vuoto: la modalità delle impostazioni generali.",
+            "vacuum_mode": "Vuoto: la modalità delle impostazioni generali."
           }
         },
         "reconfigure": {
@@ -104,13 +111,19 @@
             "min_gap_hours": "Ore minime fra due passate",
             "full_deadline": "Ora limite per aspirazione e lavaggio",
             "vacuum_deadline": "Ora limite per l'aspirazione",
+            "fan_speed": "Velocità della ventola in questa stanza",
+            "full_mode": "Modalità per aspirazione e lavaggio in questa stanza",
+            "vacuum_mode": "Modalità per la sola aspirazione in questa stanza",
             "clean_action": "Azione di pulizia personalizzata (facoltativa)"
           },
           "data_description": {
             "proxy_sensors": "Per le stanze senza un sensore proprio: la stanza è libera mentre uno di questi sensori rileva qualcuno altrove.",
             "vacuum_per_day": "Un'aspirazione con lavaggio vale anche come aspirazione.",
             "full_deadline": "Dopo quest'ora la stanza viene pulita anche se c'è qualcuno, con la potenza silenziosa. Lascia vuoto per non forzarla mai.",
-            "clean_action": "Sostituisce la pulizia standard per area, per i robot la cui integrazione non la supporta. Variabili: room, area_id, kind (full o vacuum), quiet, vacuum_entity."
+            "clean_action": "Sostituisce la pulizia standard per area, per i robot la cui integrazione non la supporta. Variabili: room, area_id, kind (full o vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Vuoto: la velocità delle impostazioni generali. La velocità silenziosa ha comunque la precedenza quando la stanza si pulisce dopo l'ora limite con qualcuno dentro.",
+            "full_mode": "Vuoto: la modalità delle impostazioni generali.",
+            "vacuum_mode": "Vuoto: la modalità delle impostazioni generali."
           }
         }
       }

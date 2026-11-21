@@ -313,3 +313,44 @@ async def test_room_devices_hang_from_the_robot(
     room = reg.async_get_device_by_identifier((DOMAIN, room_id), entry.entry_id)
     assert robot is not None and room is not None
     assert room.via_device_id == robot.id
+
+
+async def test_room_fan_speed_and_modes(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The room's own fan speed and work modes replace the global ones."""
+    _, _, calls = await make(
+        hass,
+        freezer,
+        fan_speed="quiet",
+        full_mode="vacuum",
+        vacuum_mode="mop_after_vacuum",
+    )
+    await advance(hass, freezer, 11)
+    assert len(calls["clean_area"]) == 1
+    assert calls["fan"][-1].data["fan_speed"] == "quiet"
+    assert calls["mode"][-1].data["option"] == "vacuum"  # room's full mode
+
+
+async def test_room_empty_settings_fall_back_to_global(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Without room settings the global ones apply."""
+    _, _, calls = await make(hass, freezer, fan_speed="", full_mode=None)
+    await advance(hass, freezer, 11)
+    assert calls["fan"][-1].data["fan_speed"] == "normal"
+    assert calls["mode"][-1].data["option"] == "mop_after_vacuum"
+
+
+async def test_quiet_wins_over_room_fan_speed(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Forced while someone is there: the quiet speed, not the room's."""
+    hass.states.async_set(VACUUM, "docked", {"fan_speed_list": ["quiet", "normal", "max"]})
+    _, _, calls = await make(hass, freezer, fan_speed="max")
+    hass.states.async_set(VACUUM, "docked", {"fan_speed_list": ["quiet", "normal", "max"]})
+    hass.states.async_set(SENSOR, "on")
+    freezer.move_to("2026-01-12 18:59:30+01:00")
+    await advance(hass, freezer, 1)
+    assert len(calls["clean_area"]) == 1
+    assert calls["fan"][-1].data["fan_speed"] == "quiet"

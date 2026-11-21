@@ -7,7 +7,13 @@ import "../components/tr-room-tile";
 import { deleteRoom, errorMessage, fetchHistory, fetchRoomForm, saveRoom } from "../api";
 import { confirmDialog } from "../components/tr-confirm";
 import { type FormatContext, formatDayTime, formatDuration } from "../format";
-import { formCallbacks, splitErrors } from "../form";
+import {
+  fanSpeedLabel,
+  formCallbacks,
+  labelRobotOptions,
+  splitErrors,
+  workModeLabel,
+} from "../form";
 import { navigate, notify, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
 import type { FormField, HomeAssistant, JobRecord, LoadedSnapshot } from "../types";
@@ -30,6 +36,7 @@ const SECTIONS: { key: string; icon: string; fields: string[] }[] = [
     icon: "mdi:clock-alert-outline",
     fields: ["full_deadline", "vacuum_deadline"],
   },
+  { key: "robot", icon: "mdi:robot-vacuum", fields: ["fan_speed", "full_mode", "vacuum_mode"] },
   { key: "advanced", icon: "mdi:code-braces", fields: [] },
 ];
 
@@ -267,8 +274,13 @@ export class TrRoomEditor extends LitElement {
     return html`
       ${base ? html`<div class="error-box">${cb.computeError(base)}</div>` : nothing}
       ${SECTIONS.map((section) => {
-        const schema = this._schema!.filter((f) =>
-          section.fields.length ? section.fields.includes(f.name) : !listed.has(f.name),
+        const schema = labelRobotOptions(
+          this._schema!.filter((f) =>
+            section.fields.length ? section.fields.includes(f.name) : !listed.has(f.name),
+          ),
+          this.hass,
+          this.snapshot.robot.entity_id,
+          this.snapshot.work_mode_entity,
         );
         if (!schema.length) return nothing;
         const form = html`<div class="card-content">
@@ -299,7 +311,9 @@ export class TrRoomEditor extends LitElement {
           ${
             section.key === "area"
               ? html`<div class="card-content hint">${t("editor.area_hint")}</div>`
-              : nothing
+              : section.key === "robot"
+                ? html`<div class="card-content hint">${this._robotHint()}</div>`
+                : nothing
           }
           ${form}
         </div>`;
@@ -321,6 +335,24 @@ export class TrRoomEditor extends LitElement {
         }
       </div>
     `;
+  }
+
+  /** What an empty robot field means: the global settings, by name. */
+  private _robotHint(): string {
+    const { t } = this.ctx;
+    const s = this.snapshot;
+    const none = t("editor.robot_unset");
+    const fan = s.normal_fan_speed
+      ? fanSpeedLabel(this.hass, s.robot.entity_id, s.normal_fan_speed)
+      : none;
+    const mode = (v: string | null) => (v ? workModeLabel(this.hass, s.work_mode_entity, v) : none);
+    let text = t("editor.robot_hint", {
+      fan,
+      full: mode(s.full_mode_option),
+      vacuum: mode(s.vacuum_mode_option),
+    });
+    if (!s.work_mode_entity) text += ` ${t("editor.robot_no_modes")}`;
+    return text;
   }
 
   private _jobsCard() {

@@ -44,14 +44,15 @@
       "robot": {
         "title": "Robotereinstellungen",
         "data": {
-          "normal_fan_speed": "Normale Saugstufe",
-          "quiet_fan_speed": "Leise Saugstufe",
-          "full_mode_option": "Modus für Saugen und Wischen",
-          "vacuum_mode_option": "Modus für nur Saugen"
+          "normal_fan_speed": "Saugstufe bei der Reinigung",
+          "quiet_fan_speed": "Saugstufe, wenn jemand im Raum ist",
+          "full_mode_option": "Arbeitsmodus des Roboters für Saugen und Wischen",
+          "vacuum_mode_option": "Arbeitsmodus des Roboters für nur Saugen"
         },
         "data_description": {
           "quiet_fan_speed": "Nur verwendet, wenn ein Raum nach seiner Frist gereinigt werden muss, während jemand da ist."
-        }
+        },
+        "description": "Jedes Menü bietet alle Optionen des Roboters. Räume können eigene Saugstufen und Modi haben."
       }
     }
   },
@@ -83,13 +84,19 @@
             "min_gap_hours": "Mindeststunden zwischen zwei Durchgängen",
             "full_deadline": "Frist für Saugen und Wischen",
             "vacuum_deadline": "Frist für Saugen",
+            "fan_speed": "Saugstufe in diesem Raum",
+            "full_mode": "Arbeitsmodus für Saugen und Wischen in diesem Raum",
+            "vacuum_mode": "Arbeitsmodus für nur Saugen in diesem Raum",
             "clean_action": "Eigene Reinigungsaktion (optional)"
           },
           "data_description": {
             "proxy_sensors": "Für Räume ohne eigenen Sensor: Der Raum gilt als frei, solange einer dieser Sensoren anderswo jemanden erkennt.",
             "vacuum_per_day": "Ein Saug- und Wischdurchgang zählt auch als Saugdurchgang.",
             "full_deadline": "Nach dieser Uhrzeit wird der Raum auch gereinigt, wenn jemand da ist, mit der leisen Saugstufe. Leer lassen, um es nie zu erzwingen.",
-            "clean_action": "Ersetzt die Standard-Bereichsreinigung für Roboter, deren Integration sie nicht unterstützt. Variablen: room, area_id, kind (full oder vacuum), quiet, vacuum_entity."
+            "clean_action": "Ersetzt die Standard-Bereichsreinigung für Roboter, deren Integration sie nicht unterstützt. Variablen: room, area_id, kind (full oder vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Leer: die Saugstufe der allgemeinen Einstellungen. Die leise Saugstufe hat weiterhin Vorrang, wenn der Raum nach der Frist gereinigt wird, während jemand da ist.",
+            "full_mode": "Leer: der Modus der allgemeinen Einstellungen.",
+            "vacuum_mode": "Leer: der Modus der allgemeinen Einstellungen."
           }
         },
         "reconfigure": {
@@ -104,13 +111,19 @@
             "min_gap_hours": "Mindeststunden zwischen zwei Durchgängen",
             "full_deadline": "Frist für Saugen und Wischen",
             "vacuum_deadline": "Frist für Saugen",
+            "fan_speed": "Saugstufe in diesem Raum",
+            "full_mode": "Arbeitsmodus für Saugen und Wischen in diesem Raum",
+            "vacuum_mode": "Arbeitsmodus für nur Saugen in diesem Raum",
             "clean_action": "Eigene Reinigungsaktion (optional)"
           },
           "data_description": {
             "proxy_sensors": "Für Räume ohne eigenen Sensor: Der Raum gilt als frei, solange einer dieser Sensoren anderswo jemanden erkennt.",
             "vacuum_per_day": "Ein Saug- und Wischdurchgang zählt auch als Saugdurchgang.",
             "full_deadline": "Nach dieser Uhrzeit wird der Raum auch gereinigt, wenn jemand da ist, mit der leisen Saugstufe. Leer lassen, um es nie zu erzwingen.",
-            "clean_action": "Ersetzt die Standard-Bereichsreinigung für Roboter, deren Integration sie nicht unterstützt. Variablen: room, area_id, kind (full oder vacuum), quiet, vacuum_entity."
+            "clean_action": "Ersetzt die Standard-Bereichsreinigung für Roboter, deren Integration sie nicht unterstützt. Variablen: room, area_id, kind (full oder vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Leer: die Saugstufe der allgemeinen Einstellungen. Die leise Saugstufe hat weiterhin Vorrang, wenn der Raum nach der Frist gereinigt wird, während jemand da ist.",
+            "full_mode": "Leer: der Modus der allgemeinen Einstellungen.",
+            "vacuum_mode": "Leer: der Modus der allgemeinen Einstellungen."
           }
         }
       }

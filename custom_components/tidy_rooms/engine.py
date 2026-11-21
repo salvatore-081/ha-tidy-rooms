@@ -65,7 +65,10 @@ from .const import (
     CONF_QUIET_END,
     CONF_QUIET_FAN_SPEED,
     CONF_QUIET_START,
+    CONF_ROOM_FAN_SPEED,
+    CONF_ROOM_FULL_MODE,
     CONF_ROOM_ORDER,
+    CONF_ROOM_VACUUM_MODE,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
     CONF_VACUUM_DEADLINE,
@@ -183,6 +186,9 @@ class Room:
     config: RoomConfig
     state: RoomState
     clean_action: list[dict[str, Any]] | None = None
+    # Robot settings of the room; None means the global setting.
+    fan_speed: str | None = None
+    mode_option: dict[CleanKind, str | None] = field(default_factory=dict)
     script: Script | None = None
     action_error: bool = False
     last_result: str | None = None  # done / interrupted / failed / stopped
@@ -270,6 +276,11 @@ class TidyRoomsEngine:
                 ),
                 state=RoomState(),
                 clean_action=d.get(CONF_CLEAN_ACTION) or None,
+                fan_speed=d.get(CONF_ROOM_FAN_SPEED) or None,
+                mode_option={
+                    CleanKind.FULL: d.get(CONF_ROOM_FULL_MODE) or None,
+                    CleanKind.VACUUM: d.get(CONF_ROOM_VACUUM_MODE) or None,
+                },
             )
         # Priority order (last tie-breaker of the plan): set from the panel.
         self.rooms = self._ordered(self.rooms, opts.get(CONF_ROOM_ORDER) or [])
@@ -781,13 +792,15 @@ class TidyRoomsEngine:
 
     async def _async_send_job(self, decision: Decision) -> None:
         room = self.rooms[decision.room_id]
-        if self.work_mode_entity and (option := self.mode_option[decision.kind]):
+        option = room.mode_option.get(decision.kind) or self.mode_option[decision.kind]
+        if self.work_mode_entity and option:
             await self._async_call(
                 "select",
                 "select_option",
                 {ATTR_ENTITY_ID: self.work_mode_entity, "option": option},
             )
-        speed = self.quiet_fan if decision.quiet else self.normal_fan
+        # Quiet (forced while someone is there) wins over the room's own speed.
+        speed = self.quiet_fan if decision.quiet else (room.fan_speed or self.normal_fan)
         if speed:
             await self._async_fan(speed)
         if room.script is not None:
@@ -851,6 +864,11 @@ class TidyRoomsEngine:
             "quiet_start": quiet.quiet_start.isoformat() if quiet.quiet_start else None,
             "quiet_end": quiet.quiet_end.isoformat() if quiet.quiet_end else None,
             "min_battery": quiet.min_battery,
+            "work_mode_entity": self.work_mode_entity,
+            "normal_fan_speed": self.normal_fan,
+            "quiet_fan_speed": self.quiet_fan,
+            "full_mode_option": self.mode_option[CleanKind.FULL],
+            "vacuum_mode_option": self.mode_option[CleanKind.VACUUM],
             "paused_until": _iso(self._failed_until)
             if self._failed_until and now < self._failed_until
             else None,
@@ -912,6 +930,9 @@ class TidyRoomsEngine:
             "last_vacuum": _iso(st.last_vacuum),
             "last_result": room.last_result,
             "custom_action": room.clean_action is not None,
+            "fan_speed": room.fan_speed,
+            "full_mode": room.mode_option.get(CleanKind.FULL),
+            "vacuum_mode": room.mode_option.get(CleanKind.VACUUM),
             "outlook": {
                 "kind": ol.kind.value if ol.kind else None,
                 "earliest": _iso(ol.earliest),

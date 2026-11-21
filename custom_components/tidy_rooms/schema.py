@@ -33,6 +33,9 @@ from .const import (
     CONF_QUIET_END,
     CONF_QUIET_FAN_SPEED,
     CONF_QUIET_START,
+    CONF_ROOM_FAN_SPEED,
+    CONF_ROOM_FULL_MODE,
+    CONF_ROOM_VACUUM_MODE,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
     CONF_VACUUM_DEADLINE,
@@ -103,11 +106,39 @@ def _dropdown(options: list[str]) -> selector.SelectSelector:
     )
 
 
+def fan_speeds(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
+    """Fan speeds the robot offers (empty if it reports none or is missing)."""
+    vacuum = hass.states.get(entry.data[CONF_VACUUM])
+    return list(vacuum.attributes.get("fan_speed_list") or []) if vacuum else []
+
+
+def work_modes(hass: HomeAssistant, work_mode_entity: str | None) -> list[str]:
+    """Options of the robot's work mode select entity."""
+    if not work_mode_entity:
+        return []
+    state = hass.states.get(work_mode_entity)
+    return list(state.attributes.get("options") or []) if state else []
+
+
 # ------------------------------------------------------------------ rooms
 
 
-def room_schema() -> vol.Schema:
-    """Fields of a room."""
+def room_schema(
+    hass: HomeAssistant | None = None, entry: ConfigEntry | None = None
+) -> vol.Schema:
+    """Fields of a room.
+
+    With `hass` and `entry`, also the robot settings of the room (fan speed,
+    work modes), offered from the robot's own lists; empty means the global
+    setting.
+    """
+    robot: dict[vol.Marker, Any] = {}
+    if hass is not None and entry is not None:
+        if speeds := fan_speeds(hass, entry):
+            robot[vol.Optional(CONF_ROOM_FAN_SPEED)] = _dropdown(speeds)
+        if modes := work_modes(hass, entry.options.get(CONF_WORK_MODE_ENTITY)):
+            robot[vol.Optional(CONF_ROOM_FULL_MODE)] = _dropdown(modes)
+            robot[vol.Optional(CONF_ROOM_VACUUM_MODE)] = _dropdown(modes)
     return vol.Schema(
         {
             vol.Required(CONF_AREA): selector.AreaSelector(),
@@ -127,6 +158,7 @@ def room_schema() -> vol.Schema:
             ),
             vol.Optional(CONF_FULL_DEADLINE): selector.TimeSelector(),
             vol.Optional(CONF_VACUUM_DEADLINE): selector.TimeSelector(),
+            **robot,
             vol.Optional(CONF_CLEAN_ACTION): selector.ActionSelector(),
         }
     )
@@ -214,17 +246,12 @@ def settings_sections(
     }
 
     robot: dict[vol.Marker, Any] = {}
-    vacuum = hass.states.get(entry.data[CONF_VACUUM])
-    fan_speeds = list(vacuum.attributes.get("fan_speed_list") or []) if vacuum else []
-    if fan_speeds:
-        robot[vol.Optional(CONF_NORMAL_FAN_SPEED)] = _dropdown(fan_speeds)
-        robot[vol.Optional(CONF_QUIET_FAN_SPEED)] = _dropdown(fan_speeds)
-    if work_mode_entity:
-        mode_state = hass.states.get(work_mode_entity)
-        modes = list(mode_state.attributes.get("options") or []) if mode_state else []
-        if modes:
-            robot[vol.Optional(CONF_FULL_MODE_OPTION)] = _dropdown(modes)
-            robot[vol.Optional(CONF_VACUUM_MODE_OPTION)] = _dropdown(modes)
+    if speeds := fan_speeds(hass, entry):
+        robot[vol.Optional(CONF_NORMAL_FAN_SPEED)] = _dropdown(speeds)
+        robot[vol.Optional(CONF_QUIET_FAN_SPEED)] = _dropdown(speeds)
+    if modes := work_modes(hass, work_mode_entity):
+        robot[vol.Optional(CONF_FULL_MODE_OPTION)] = _dropdown(modes)
+        robot[vol.Optional(CONF_VACUUM_MODE_OPTION)] = _dropdown(modes)
     sections[SECTION_ROBOT] = vol.Schema(robot)
     return sections
 

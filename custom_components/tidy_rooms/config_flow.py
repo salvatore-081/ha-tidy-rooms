@@ -177,7 +177,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(
             step_id="user",
             data_schema=self.add_suggested_values_to_schema(
-                room_schema(),
+                room_schema(self.hass, self._get_entry()),
                 user_input or ROOM_DEFAULTS,
             ),
             errors=errors,
@@ -203,7 +203,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self.add_suggested_values_to_schema(
-                room_schema(), user_input or subentry.data
+                room_schema(self.hass, self._get_entry()), user_input or subentry.data
             ),
             errors=errors,
         )

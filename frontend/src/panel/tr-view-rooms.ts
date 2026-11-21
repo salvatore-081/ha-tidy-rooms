@@ -7,6 +7,7 @@ import "../components/tr-switch";
 import { deleteRoom, errorMessage, reorderRooms, setRoomEnabled } from "../api";
 import { confirmDialog } from "../components/tr-confirm";
 import { type FormatContext, formatClock, statusIcon, statusLabel, statusTone } from "../format";
+import { fanSpeedLabel } from "../form";
 import { navigate, notify, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
 import type { HomeAssistant, LoadedSnapshot, RoomSnapshot } from "../types";
@@ -178,6 +179,16 @@ export class TrViewRooms extends LitElement {
           <span>${sensors}</span><span>${targets}</span
           ><span>${t("rooms.gap", { n: room.min_gap_hours })}</span
           ><span>${t("rooms.deadlines", { times: deadlines })}</span>
+          ${
+            room.fan_speed
+              ? html`<span
+                  >${t("rooms.fan", {
+                    speed: fanSpeedLabel(this.hass, this.snapshot.robot.entity_id, room.fan_speed),
+                  })}</span
+                >`
+              : nothing
+          }
+          ${room.full_mode || room.vacuum_mode ? html`<span>${t("rooms.own_modes")}</span>` : nothing}
           ${room.custom_action ? html`<span>${t("rooms.custom_action")}</span>` : nothing}
         </div>
       </div>

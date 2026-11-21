@@ -242,7 +242,8 @@ async def ws_schema(
             else dict(ROOM_DEFAULTS)
         )
         connection.send_result(
-            msg["id"], {"schema": _serialize(room_schema()), "values": values}
+            msg["id"],
+            {"schema": _serialize(room_schema(hass, entry)), "values": values},
         )
         return
     work_mode = msg.get("work_mode_entity", entry.options.get(CONF_WORK_MODE_ENTITY))
@@ -278,7 +279,7 @@ async def ws_room_save(
     entry = _entry(hass, msg["entry_id"])
     current = _room(entry, msg["room_id"]) if "room_id" in msg else None
     try:
-        data = room_schema()(msg["data"])
+        data = room_schema(hass, entry)(msg["data"])
     except vol.Invalid as err:
         connection.send_result(msg["id"], {"errors": _field_errors(err)})
         return

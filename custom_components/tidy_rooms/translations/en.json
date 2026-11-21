@@ -44,14 +44,15 @@
       "robot": {
         "title": "Robot settings",
         "data": {
-          "normal_fan_speed": "Normal fan speed",
-          "quiet_fan_speed": "Quiet fan speed",
-          "full_mode_option": "Work mode for vacuum and mop",
-          "vacuum_mode_option": "Work mode for vacuum only"
+          "normal_fan_speed": "Fan speed of the cleanings",
+          "quiet_fan_speed": "Fan speed while someone is in the room",
+          "full_mode_option": "Robot work mode for the vacuum and mop passes",
+          "vacuum_mode_option": "Robot work mode for the vacuum passes"
         },
         "data_description": {
           "quiet_fan_speed": "Used only when a room must be cleaned after its deadline while someone is there."
-        }
+        },
+        "description": "Each menu offers all the options of the robot. Rooms can use their own speed and modes."
       }
     }
   },
@@ -83,13 +84,19 @@
             "min_gap_hours": "Minimum hours between two passes",
             "full_deadline": "Deadline for vacuum and mop",
             "vacuum_deadline": "Deadline for vacuum",
+            "fan_speed": "Fan speed in this room",
+            "full_mode": "Work mode for vacuum and mop in this room",
+            "vacuum_mode": "Work mode for vacuum only in this room",
             "clean_action": "Custom clean action (optional)"
           },
           "data_description": {
             "proxy_sensors": "For rooms without their own sensor: the room counts as free while one of these sensors detects someone elsewhere.",
             "vacuum_per_day": "A vacuum and mop pass counts as a vacuum pass too.",
             "full_deadline": "After this time the room is cleaned even if someone is there, with the quiet fan speed. Leave empty to never force it.",
-            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity."
+            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Empty: the speed of the global settings. The quiet speed still wins when the room is cleaned after its deadline while someone is there.",
+            "full_mode": "Empty: the mode of the global settings.",
+            "vacuum_mode": "Empty: the mode of the global settings."
           }
         },
         "reconfigure": {
@@ -104,13 +111,19 @@
             "min_gap_hours": "Minimum hours between two passes",
             "full_deadline": "Deadline for vacuum and mop",
             "vacuum_deadline": "Deadline for vacuum",
+            "fan_speed": "Fan speed in this room",
+            "full_mode": "Work mode for vacuum and mop in this room",
+            "vacuum_mode": "Work mode for vacuum only in this room",
             "clean_action": "Custom clean action (optional)"
           },
           "data_description": {
             "proxy_sensors": "For rooms without their own sensor: the room counts as free while one of these sensors detects someone elsewhere.",
             "vacuum_per_day": "A vacuum and mop pass counts as a vacuum pass too.",
             "full_deadline": "After this time the room is cleaned even if someone is there, with the quiet fan speed. Leave empty to never force it.",
-            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity."
+            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Empty: the speed of the global settings. The quiet speed still wins when the room is cleaned after its deadline while someone is there.",
+            "full_mode": "Empty: the mode of the global settings.",
+            "vacuum_mode": "Empty: the mode of the global settings."
           }
         }
       }

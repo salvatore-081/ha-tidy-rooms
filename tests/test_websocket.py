@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -371,7 +373,10 @@ async def test_panel_registered_once_and_removed(
         kwargs = register.call_args.kwargs
         assert kwargs["frontend_url_path"] == "tidy-rooms"
         assert kwargs["require_admin"] is True
-        assert kwargs["config"]["_panel_custom"]["js_url"].endswith("?v=0.2.0")
+        version = json.loads(
+            (Path(panel.__file__).parent / "manifest.json").read_text()
+        )["version"]
+        assert kwargs["config"]["_panel_custom"]["js_url"].endswith(f"?v={version}")
         add_js.assert_called_once()
 
         await hass.config_entries.async_unload(entry.entry_id)
@@ -391,3 +396,53 @@ async def test_panel_missing_js(
         await make(hass, freezer)
     register.assert_not_called()
     assert "install a release" in caplog.text
+
+
+async def test_room_form_offers_robot_settings(
+    hass: HomeAssistant, freezer, hass_ws_client
+) -> None:
+    client = await _ws(hass_ws_client, hass)
+    entry, _, _ = await make(hass, freezer)
+    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
+    fields = {f["name"]: f for f in res["result"]["schema"]}
+    assert fields["fan_speed"]["selector"]["select"]["options"] == ["quiet", "normal"]
+    assert fields["full_mode"]["selector"]["select"]["options"] == [
+        "vacuum",
+        "mop_after_vacuum",
+    ]
+    names = list(fields)
+    assert names.index("fan_speed") < names.index("clean_action")
+
+    # A speed the robot does not offer is rejected.
+    room_id = next(iter(entry.subentries))
+    res = await _call(
+        client,
+        type="tidy_rooms/schema",
+        entry_id=entry.entry_id,
+        form="room",
+        room_id=room_id,
+    )
+    data = {**res["result"]["values"], "fan_speed": "turbo"}
+    res = await _call(
+        client, type="tidy_rooms/room/save", entry_id=entry.entry_id, room_id=room_id, data=data
+    )
+    assert res["result"] == {"errors": {"fan_speed": "invalid"}}
+
+    data["fan_speed"] = "quiet"
+    res = await _call(
+        client, type="tidy_rooms/room/save", entry_id=entry.entry_id, room_id=room_id, data=data
+    )
+    assert res["result"] == {"room_id": room_id}
+    await hass.async_block_till_done()
+    assert entry.runtime_data.rooms[room_id].fan_speed == "quiet"
+
+
+async def test_room_form_without_work_mode_entity(
+    hass: HomeAssistant, freezer, hass_ws_client
+) -> None:
+    client = await _ws(hass_ws_client, hass)
+    entry, _, _ = await make(hass, freezer, options={CONF_WORK_MODE_ENTITY: None})
+    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
+    names = [f["name"] for f in res["result"]["schema"]]
+    assert "fan_speed" in names
+    assert "full_mode" not in names and "vacuum_mode" not in names

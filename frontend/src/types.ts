@@ -55,6 +55,10 @@ export interface RoomSnapshot {
   last_vacuum: string | null;
   last_result: JobResult | null;
   custom_action: boolean;
+  /** The room's own robot settings; null means the global setting. */
+  fan_speed: string | null;
+  full_mode: string | null;
+  vacuum_mode: string | null;
   outlook: Outlook;
 }
 
@@ -91,6 +95,11 @@ export interface LoadedSnapshot {
   quiet_start: string | null;
   quiet_end: string | null;
   min_battery: number;
+  work_mode_entity: string | null;
+  normal_fan_speed: string | null;
+  quiet_fan_speed: string | null;
+  full_mode_option: string | null;
+  vacuum_mode_option: string | null;
   paused_until: string | null;
   robot: RobotSnapshot;
   job: JobSnapshot | null;
@@ -145,4 +154,5 @@ export interface HomeAssistant {
   user?: { is_admin: boolean };
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
   formatEntityState?(stateObj: HassEntity, state?: string): string;
+  formatEntityAttributeValue?(stateObj: HassEntity, attribute: string, value?: unknown): string;
 }

@@ -44,14 +44,15 @@
       "robot": {
         "title": "Ajustes del robot",
         "data": {
-          "normal_fan_speed": "Potencia normal",
-          "quiet_fan_speed": "Potencia silenciosa",
-          "full_mode_option": "Modo para aspirar y fregar",
-          "vacuum_mode_option": "Modo para solo aspirar"
+          "normal_fan_speed": "Potencia de succión en las limpiezas",
+          "quiet_fan_speed": "Potencia de succión con alguien en la habitación",
+          "full_mode_option": "Modo del robot para las pasadas de aspirar y fregar",
+          "vacuum_mode_option": "Modo del robot para las pasadas de solo aspirar"
         },
         "data_description": {
           "quiet_fan_speed": "Solo se usa cuando una habitación debe limpiarse después de su hora límite mientras hay alguien."
-        }
+        },
+        "description": "Cada menú ofrece todas las opciones del robot. Las habitaciones pueden tener su propia potencia y sus propios modos."
       }
     }
   },
@@ -83,13 +84,19 @@
             "min_gap_hours": "Horas mínimas entre dos pasadas",
             "full_deadline": "Hora límite para aspirar y fregar",
             "vacuum_deadline": "Hora límite para aspirar",
+            "fan_speed": "Potencia de succión en esta habitación",
+            "full_mode": "Modo para aspirar y fregar en esta habitación",
+            "vacuum_mode": "Modo para solo aspirar en esta habitación",
             "clean_action": "Acción de limpieza personalizada (opcional)"
           },
           "data_description": {
             "proxy_sensors": "Para habitaciones sin sensor propio: la habitación se considera libre mientras uno de estos sensores detecta a alguien en otro sitio.",
             "vacuum_per_day": "Una pasada de aspirado y fregado cuenta también como pasada de aspirado.",
             "full_deadline": "Después de esta hora la habitación se limpia aunque haya alguien, con la potencia silenciosa. Déjalo vacío para no forzarla nunca.",
-            "clean_action": "Sustituye la limpieza estándar por área, para robots cuya integración no la admite. Variables: room, area_id, kind (full o vacuum), quiet, vacuum_entity."
+            "clean_action": "Sustituye la limpieza estándar por área, para robots cuya integración no la admite. Variables: room, area_id, kind (full o vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Vacío: la potencia de los ajustes generales. La potencia silenciosa sigue teniendo prioridad cuando la habitación se limpia después de la hora límite con alguien dentro.",
+            "full_mode": "Vacío: el modo de los ajustes generales.",
+            "vacuum_mode": "Vacío: el modo de los ajustes generales."
           }
         },
         "reconfigure": {
@@ -104,13 +111,19 @@
             "min_gap_hours": "Horas mínimas entre dos pasadas",
             "full_deadline": "Hora límite para aspirar y fregar",
             "vacuum_deadline": "Hora límite para aspirar",
+            "fan_speed": "Potencia de succión en esta habitación",
+            "full_mode": "Modo para aspirar y fregar en esta habitación",
+            "vacuum_mode": "Modo para solo aspirar en esta habitación",
             "clean_action": "Acción de limpieza personalizada (opcional)"
           },
           "data_description": {
             "proxy_sensors": "Para habitaciones sin sensor propio: la habitación se considera libre mientras uno de estos sensores detecta a alguien en otro sitio.",
             "vacuum_per_day": "Una pasada de aspirado y fregado cuenta también como pasada de aspirado.",
             "full_deadline": "Después de esta hora la habitación se limpia aunque haya alguien, con la potencia silenciosa. Déjalo vacío para no forzarla nunca.",
-            "clean_action": "Sustituye la limpieza estándar por área, para robots cuya integración no la admite. Variables: room, area_id, kind (full o vacuum), quiet, vacuum_entity."
+            "clean_action": "Sustituye la limpieza estándar por área, para robots cuya integración no la admite. Variables: room, area_id, kind (full o vacuum), quiet, vacuum_entity.",
+            "fan_speed": "Vacío: la potencia de los ajustes generales. La potencia silenciosa sigue teniendo prioridad cuando la habitación se limpia después de la hora límite con alguien dentro.",
+            "full_mode": "Vacío: el modo de los ajustes generales.",
+            "vacuum_mode": "Vacío: el modo de los ajustes generales."
           }
         }
       }

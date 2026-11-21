@@ -27,6 +27,9 @@ export const room = (over: Partial<RoomSnapshot> = {}): RoomSnapshot => ({
   last_vacuum: null,
   last_result: null,
   custom_action: false,
+  fan_speed: null,
+  full_mode: null,
+  vacuum_mode: null,
   outlook: {
     kind: "full",
     earliest: "2026-01-12T10:06:00+01:00",
@@ -50,6 +53,11 @@ export const snapshot = (over: Partial<LoadedSnapshot> = {}): LoadedSnapshot => 
   quiet_start: "22:30:00",
   quiet_end: "08:00:00",
   min_battery: 30,
+  work_mode_entity: "select.tatiana_work_mode",
+  normal_fan_speed: "normal",
+  quiet_fan_speed: "quiet",
+  full_mode_option: "mop_after_vacuum",
+  vacuum_mode_option: "vacuum",
   paused_until: null,
   robot: {
     entity_id: "vacuum.tatiana",

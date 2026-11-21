@@ -43,6 +43,10 @@ CONF_MIN_GAP_HOURS: Final = "min_gap_hours"
 CONF_FULL_DEADLINE: Final = "full_deadline"
 CONF_VACUUM_DEADLINE: Final = "vacuum_deadline"
 CONF_CLEAN_ACTION: Final = "clean_action"
+# Per-room robot settings: empty means the global setting
+CONF_ROOM_FAN_SPEED: Final = "fan_speed"
+CONF_ROOM_FULL_MODE: Final = "full_mode"
+CONF_ROOM_VACUUM_MODE: Final = "vacuum_mode"
 
 DEFAULT_QUIET_START: Final = "22:30:00"
 DEFAULT_QUIET_END: Final = "08:00:00"

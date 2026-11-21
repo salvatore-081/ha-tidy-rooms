@@ -1,6 +1,6 @@
 [project]
 name = "tidy-rooms"
-version = "0.2.0"
+version = "0.3.0"
 description = "Home Assistant integration: clean each room when it is empty, with daily targets per room."
 requires-python = ">=3.14"
 license = "MIT"
