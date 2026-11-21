@@ -82,7 +82,7 @@ from .const import (
 )
 from .history import JobHistory, JobRecord
 from .legacy import legacy_done, legacy_kind
-from .program import (
+from .planner import (
     Decision,
     GlobalConfig,
     PassDone,

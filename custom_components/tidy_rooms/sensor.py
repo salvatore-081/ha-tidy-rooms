@@ -13,7 +13,7 @@ from homeassistant.util import dt as dt_util
 from . import TidyRoomsConfigEntry
 from .engine import JobPhase, Room, TidyRoomsEngine
 from .entity import TidyRoomsEntity, TidyRoomsRoomEntity
-from .program import PassStatus, RoomStatus
+from .planner import PassStatus, RoomStatus
 
 JOB_STATES = ["idle", *[p.value for p in JobPhase]]
 

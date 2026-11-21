@@ -32,7 +32,7 @@ from .const import (
     CONF_VACUUM_PER_DAY,
     CONF_WORK_MODE,
 )
-from .program import PassDone
+from .planner import PassDone
 
 KIND_FULL = "full"
 KIND_VACUUM = "vacuum"
