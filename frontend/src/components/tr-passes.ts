@@ -1,9 +1,10 @@
 // Today's passes of one kind: a filled dot for each pass done, an empty one for each still due.
 
+import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
-@customElement("tr-passes")
+@element("tr-passes")
 export class TrPasses extends LitElement {
   @property({ type: Number }) done = 0;
   @property({ type: Number }) target = 0;

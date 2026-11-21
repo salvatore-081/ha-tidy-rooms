@@ -1,7 +1,8 @@
 // One room: status, why it waits, today's passes, last pass and outlook.
 
+import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import "./tr-passes";
 import {
   type FormatContext,
@@ -16,7 +17,7 @@ import {
 import { shared, tokens } from "../styles";
 import type { CleanKind, HomeAssistant, LoadedSnapshot, RoomSnapshot } from "../types";
 
-@customElement("tr-room-tile")
+@element("tr-room-tile")
 export class TrRoomTile extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;

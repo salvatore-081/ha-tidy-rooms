@@ -184,7 +184,7 @@ export const waitText = (room: RoomSnapshot, snap: LoadedSnapshot, ctx: FormatCo
     case "waiting_robot":
       return robotBlocker(snap, t, ctx);
     case "ready":
-      return t("wait.ready");
+      return t(snap.enabled ? "wait.ready" : "wait.ready_paused");
     case "waiting_occupied": {
       let text: string;
       if (room.occupancy_sensors.length) {
@@ -198,9 +198,7 @@ export const waitText = (room: RoomSnapshot, snap: LoadedSnapshot, ctx: FormatCo
       } else {
         text = t("wait.proxy");
       }
-      return ol.deadline
-        ? `${text} · ${t("wait.forced_at", { time: formatTime(ol.deadline, ctx) })}`
-        : text;
+      return text;
     }
     default:
       return "";

@@ -1,7 +1,8 @@
 // Dashboard card: the robot and its rooms in compact form.
 
+import { element } from "../define";
 import { LitElement, type PropertyValues, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import "../components/tr-passes";
 import { errorMessage, listEntries, subscribeSnapshot } from "../api";
 import {
@@ -29,7 +30,7 @@ export interface TidyRoomsCardConfig {
 
 const TICK_MS = 60_000;
 
-@customElement("tidy-rooms-card")
+@element("tidy-rooms-card")
 export class TidyRoomsCard extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @state() private _config!: TidyRoomsCardConfig;
@@ -272,7 +273,9 @@ export class TidyRoomsCard extends LitElement {
                 title=${t("robot.automatic")}
               ></ha-icon>
             </div>`
-          : nothing
+          : this._config.title
+            ? html`<div class="header"><div class="name">${this._config.title}</div></div>`
+            : nothing
       }
       <div class="rooms">
         ${this._visibleRooms().map((room) => {

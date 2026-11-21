@@ -1,9 +1,10 @@
 // A small accessible switch, independent from the frontend's own (which changes often).
 
+import { element } from "../define";
 import { LitElement, css, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
-@customElement("tr-switch")
+@element("tr-switch")
 export class TrSwitch extends LitElement {
   @property({ type: Boolean, reflect: true }) checked = false;
   @property({ type: Boolean, reflect: true }) disabled = false;

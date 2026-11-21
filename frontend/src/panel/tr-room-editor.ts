@@ -1,7 +1,8 @@
 // A room: its live status and recent jobs, and the form to add or edit it.
 
+import { element } from "../define";
 import { LitElement, type PropertyValues, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import "../components/tr-room-tile";
 import { deleteRoom, errorMessage, fetchHistory, fetchRoomForm, saveRoom } from "../api";
 import { confirmDialog } from "../components/tr-confirm";
@@ -32,7 +33,7 @@ const SECTIONS: { key: string; icon: string; fields: string[] }[] = [
   { key: "advanced", icon: "mdi:code-braces", fields: [] },
 ];
 
-@customElement("tr-room-editor")
+@element("tr-room-editor")
 export class TrRoomEditor extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;
@@ -137,6 +138,7 @@ export class TrRoomEditor extends LitElement {
         gap: 8px;
         flex-wrap: wrap;
         padding: 12px 0;
+        border-top: 1px solid var(--tr-border);
         background: var(--primary-background-color, #fafafa);
       }
       .jobs h2 {

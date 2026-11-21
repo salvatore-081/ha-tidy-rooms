@@ -1,7 +1,8 @@
 // The sidebar panel: toolbar, tabs and routing; it owns the live snapshot.
 
+import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import "../components/tr-confirm";
 import "./tr-view-overview";
 import "./tr-view-rooms";
@@ -29,7 +30,7 @@ type Tab = "overview" | "rooms" | "history" | "settings";
 const TABS: Tab[] = ["overview", "rooms", "history", "settings"];
 const TICK_MS = 30_000;
 
-@customElement("tidy-rooms-panel")
+@element("tidy-rooms-panel")
 export class TidyRoomsPanel extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ type: Boolean, reflect: true }) narrow = false;

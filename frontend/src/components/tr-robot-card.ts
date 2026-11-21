@@ -1,7 +1,8 @@
 // The robot: state, battery, automatic cleaning, current job and what comes next.
 
+import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import "./tr-switch";
 import {
   type FormatContext,
@@ -21,7 +22,7 @@ const batteryIcon = (level: number | null): string => {
   return `mdi:battery-${step}`;
 };
 
-@customElement("tr-robot-card")
+@element("tr-robot-card")
 export class TrRobotCard extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;

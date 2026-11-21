@@ -1,7 +1,8 @@
 // Overview tab: the robot, then one tile per room.
 
+import { element } from "../define";
 import { LitElement, css, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import "../components/tr-robot-card";
 import "../components/tr-room-tile";
 import type { FormatContext } from "../format";
@@ -9,7 +10,7 @@ import { navigate, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
 import type { HomeAssistant, LoadedSnapshot } from "../types";
 
-@customElement("tr-view-overview")
+@element("tr-view-overview")
 export class TrViewOverview extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;
@@ -29,7 +30,14 @@ export class TrViewOverview extends LitElement {
         grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: var(--tr-gap);
       }
+      .note {
+        font-size: 0.85rem;
+        font-weight: 400;
+      }
       @media (max-width: 600px) {
+        .section-title .spacer {
+          flex-basis: 100%;
+        }
         :host,
         .rooms {
           gap: 12px;
@@ -40,8 +48,9 @@ export class TrViewOverview extends LitElement {
       }
       .section-title {
         display: flex;
-        align-items: center;
-        gap: 8px;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 8px;
         margin: 8px 4px -4px;
         font-size: 1rem;
         font-weight: 500;
@@ -66,7 +75,7 @@ export class TrViewOverview extends LitElement {
           ? html`
               <div class="section-title">
                 <span class="spacer">${t("overview.rooms", { n: s.rooms.length })}</span>
-                <span>${t("overview.estimate_note")}</span>
+                <span class="note">${t("overview.estimate_note")}</span>
               </div>
               <div class="rooms">
                 ${s.rooms.map(

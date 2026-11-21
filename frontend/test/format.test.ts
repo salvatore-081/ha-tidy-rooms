@@ -31,9 +31,7 @@ describe("times", () => {
 
 describe("room texts", () => {
   it("explains an empty room that is not free yet", () => {
-    expect(waitText(room(), snapshot(), ctx)).toBe(
-      "Vuota da 4 min su 10 · pulita comunque alle 19:00",
-    );
+    expect(waitText(room(), snapshot(), ctx)).toBe("Vuota da 4 min su 10");
   });
 
   it("explains an occupied room without deadline", () => {
@@ -52,6 +50,15 @@ describe("room texts", () => {
     };
     expect(waitText(r, snapshot(), ctx)).toBe("Prossima passata dalle 16:00 (distanza minima).");
     expect(outlookText(r, ctx)).toBe("Aspirazione dalle 16:00");
+  });
+
+  it("does not promise a start while automatic cleaning is paused", () => {
+    expect(waitText(room({ status: "ready" }), snapshot(), ctx)).toBe(
+      "Libera e da pulire: il robot parte a breve.",
+    );
+    expect(waitText(room({ status: "ready" }), snapshot({ enabled: false }), ctx)).toBe(
+      "Libera e da pulire: la pulizia automatica è in pausa.",
+    );
   });
 
   it("explains a low battery", () => {

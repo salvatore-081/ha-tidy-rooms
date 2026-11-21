@@ -1,7 +1,8 @@
 // Rooms tab: the rooms in priority order, to reorder, include, edit, add or delete.
 
+import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import "../components/tr-switch";
 import { deleteRoom, errorMessage, reorderRooms, setRoomEnabled } from "../api";
 import { confirmDialog } from "../components/tr-confirm";
@@ -10,7 +11,7 @@ import { navigate, notify, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
 import type { HomeAssistant, LoadedSnapshot, RoomSnapshot } from "../types";
 
-@customElement("tr-view-rooms")
+@element("tr-view-rooms")
 export class TrViewRooms extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;
@@ -100,11 +101,8 @@ export class TrViewRooms extends LitElement {
         .rank {
           display: none;
         }
-        li {
-          flex-wrap: wrap;
-        }
-        .info {
-          flex-basis: calc(100% - 140px);
+        .delete {
+          display: none;
         }
       }
     `,
@@ -197,7 +195,7 @@ export class TrViewRooms extends LitElement {
         <ha-icon icon="mdi:pencil-outline"></ha-icon>
       </button>
       <button
-        class="icon-btn"
+        class="icon-btn delete"
         aria-label=${t("rooms.delete", { room: room.name })}
         title=${t("rooms.delete", { room: room.name })}
         @click=${() => this._delete(room)}

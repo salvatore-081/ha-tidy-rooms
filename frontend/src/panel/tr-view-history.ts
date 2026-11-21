@@ -1,7 +1,8 @@
 // History tab: jobs of the last 7 or 30 days, with a summary per room.
 
+import { element } from "../define";
 import { LitElement, type PropertyValues, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import { errorMessage, fetchHistory } from "../api";
 import { type FormatContext, formatDayTime, formatDuration, formatTime } from "../format";
 import { shared, tokens } from "../styles";
@@ -45,7 +46,7 @@ export const summarize = (jobs: JobRecord[]): RoomSummary[] => {
   return [...byRoom.values()].sort((a, b) => a.room.localeCompare(b.room));
 };
 
-@customElement("tr-view-history")
+@element("tr-view-history")
 export class TrViewHistory extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;
@@ -271,7 +272,7 @@ export class TrViewHistory extends LitElement {
             <span title=${t("kind.vacuum")}><ha-icon icon="mdi:broom"></ha-icon>${s.vacuum}</span>
             <span title=${t("history.total_time")}
               ><ha-icon icon="mdi:timer-outline"></ha-icon
-              >${formatDuration(s.minutes * 60_000, t)}</span
+              >${s.minutes > 0 ? formatDuration(s.minutes * 60_000, t) : "–"}</span
             >
           </div>
           ${problems.length ? html`<div class="problems">${problems.join(" · ")}</div>` : nothing}

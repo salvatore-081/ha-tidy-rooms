@@ -288,6 +288,7 @@ class TidyRoomsEngine:
         )
         self._context = Context()
         self.history = JobHistory(hass, entry.entry_id)
+        self.device_id: str | None = None  # set by async_setup_entry
         self.loaded_config = self.config_key(entry)
 
     @staticmethod

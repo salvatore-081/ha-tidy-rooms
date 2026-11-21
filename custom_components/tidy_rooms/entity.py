@@ -54,5 +54,5 @@ class TidyRoomsRoomEntity(TidyRoomsEntity):
             name=f"Tidy Rooms {room.config.name}",
             suggested_area=area.name if area else None,
             entry_type=DeviceEntryType.SERVICE,
-            via_device=(DOMAIN, engine.entry.entry_id),
+            via_device_id=engine.device_id,
         )

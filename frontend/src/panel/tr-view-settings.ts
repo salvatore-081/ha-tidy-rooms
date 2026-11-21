@@ -1,7 +1,8 @@
 // Settings tab: the global settings, by section, saved together.
 
+import { element } from "../define";
 import { LitElement, type PropertyValues, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import { errorMessage, fetchSettingsForm, saveSettings } from "../api";
 import type { FormatContext } from "../format";
 import { formCallbacks, splitErrors } from "../form";
@@ -26,7 +27,7 @@ const clean = (data: Record<string, unknown>) =>
     ),
   );
 
-@customElement("tr-view-settings")
+@element("tr-view-settings")
 export class TrViewSettings extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) snapshot!: LoadedSnapshot;
@@ -77,6 +78,7 @@ export class TrViewSettings extends LitElement {
         gap: 8px;
         flex-wrap: wrap;
         padding: 12px 0;
+        border-top: 1px solid var(--tr-border);
         background: var(--primary-background-color, #fafafa);
       }
       .dirty {

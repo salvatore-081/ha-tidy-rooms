@@ -298,3 +298,18 @@ async def test_job_started_elsewhere_keeps_robot_busy(
     hass.states.async_set(JOB, "off")
     await advance(hass, freezer, 1)
     assert len(calls["clean_area"]) == 1
+
+
+async def test_room_devices_hang_from_the_robot(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, setup
+) -> None:
+    """Room devices are linked to the robot device by its registry id."""
+    from homeassistant.helpers import device_registry as dr
+
+    entry, _, _ = setup
+    reg = dr.async_get(hass)
+    robot = reg.async_get_device_by_identifier((DOMAIN, entry.entry_id), entry.entry_id)
+    room_id = next(iter(entry.subentries))
+    room = reg.async_get_device_by_identifier((DOMAIN, room_id), entry.entry_id)
+    assert robot is not None and room is not None
+    assert room.via_device_id == robot.id

@@ -1,8 +1,9 @@
 // A confirmation dialog. Plain fixed overlay (not a top-layer <dialog>), so it
 // stays below the frontend's own popups.
 
+import { element } from "../define";
 import { LitElement, css, html } from "lit";
-import { customElement, property, query } from "lit/decorators.js";
+import { property, query } from "lit/decorators.js";
 import { shared, tokens } from "../styles";
 
 export interface ConfirmOptions {
@@ -13,7 +14,7 @@ export interface ConfirmOptions {
   destructive?: boolean;
 }
 
-@customElement("tr-confirm")
+@element("tr-confirm")
 export class TrConfirm extends LitElement {
   @property({ attribute: false }) options!: ConfirmOptions;
   @query(".confirm") private _confirmButton!: HTMLButtonElement;

@@ -1,13 +1,14 @@
 // Visual editor of the card.
 
+import { element } from "../define";
 import { LitElement, type PropertyValues, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import { listEntries, subscribeSnapshot } from "../api";
 import { type Localize, localizer } from "../localize";
 import type { EntrySummary, HomeAssistant, RoomSnapshot } from "../types";
 import type { TidyRoomsCardConfig } from "./tidy-rooms-card";
 
-@customElement("tidy-rooms-card-editor")
+@element("tidy-rooms-card-editor")
 export class TidyRoomsCardEditor extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @state() private _config!: TidyRoomsCardConfig;
