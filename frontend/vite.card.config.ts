@@ -4,7 +4,16 @@ import { defineConfig, type Plugin } from "vite";
 // The card is loaded on every page of the frontend: ship only its strings.
 // The locale filter is adapted from RoomMind (https://github.com/snazzybean/roommind,
 // MIT, Copyright (c) 2026 SnazzyBean).
-const CARD_KEY_PREFIXES = ["card.", "status.", "kind.", "wait.", "outlook.", "robot.", "time.", "job."];
+const CARD_KEY_PREFIXES = [
+  "card.",
+  "status.",
+  "kind.",
+  "wait.",
+  "outlook.",
+  "robot.",
+  "time.",
+  "job.",
+];
 
 function cardLocales(): Plugin {
   return {
