@@ -1,0 +1,28 @@
+{
+  "name": "tidy-rooms-frontend",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && vite build -c vite.card.config.ts && node scripts/check-bundles.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test && prettier --check src test",
+    "format": "prettier --write src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "lit": "3.3.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "eslint-plugin-lit": "2.3.1",
+    "happy-dom": "21.0.4",
+    "home-assistant-js-websocket": "9.8.1",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
+  }
+}

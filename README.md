@@ -4,7 +4,7 @@ A Home Assistant integration that cleans each room **when nobody is in it**, whi
 
 Instead of fixed schedules, you set targets per room (for example *one vacuum and mop pass and two vacuum passes a day, at least 6 hours apart*). Tidy Rooms watches your presence sensors and sends the robot to a room as soon as it has been empty for a while. If a room never empties, it is cleaned anyway after a deadline you choose, with the quiet fan speed.
 
-> **Status: early development.** The rules and the integration are covered by automated tests, but it has not yet been run on a real Home Assistant installation. Feedback and issues are welcome.
+> **Status: early development.** The rules and the integration are covered by automated tests, but they have not yet driven a robot in a real home. Feedback and issues are welcome.
 
 ## How it works
 
@@ -26,6 +26,30 @@ Priority when several rooms are due: forced (past the deadline) first, then vacu
 - A robot vacuum entity that supports **area cleaning** (`vacuum.clean_area`), with the robot's rooms mapped to Home Assistant areas: open the vacuum entity settings and map each room to an area. If your robot's integration does not support area cleaning, you can use a custom clean action per room (see below).
 - Presence sensors (mmWave sensors work best: they see people sitting still).
 
+## Panel
+
+Tidy Rooms adds a **Tidy Rooms** panel to the sidebar (administrators only), in English, Italian, German, Spanish and French:
+
+- **Overview**: the robot (state, battery, automatic cleaning on or off, the job in progress, the next room), then a tile per room with its status, why it is waiting (for example *empty for 4 of 10 min*, *next pass from 15:20*), today's passes against the targets, the last pass and an estimate of the next one. Buttons clean a room right away.
+- **Rooms**: the rooms in priority order (the order breaks ties when several rooms could be cleaned), to reorder, skip, add, edit or delete. A room page shows its live status and its recent jobs next to the form.
+- **History**: the jobs of the last 7 or 30 days, with their result (done, interrupted, failed, stopped) and a summary per room.
+- **Settings**: quiet hours, wake-up check, how to drive the robot and how to tell that a job is over.
+
+Times in the panel are estimates: a room that is empty now may be occupied in ten minutes.
+
+## Card
+
+The **Tidy Rooms card** (`custom:tidy-rooms-card`) shows the robot and the rooms in compact form on any dashboard, with a visual editor. It needs no resource to be added by hand.
+
+```yaml
+type: custom:tidy-rooms-card
+entry_id: 01J...      # optional: the robot, when Tidy Rooms manages more than one
+title: Cleaning       # optional
+rooms: [01J..., 01J...]  # optional: which rooms, in the panel order (all by default)
+show_robot: true
+show_outlook: true
+```
+
 ## Installation
 
 ### Marketplace (HACS)
@@ -34,17 +58,19 @@ Priority when several rooms are due: forced (past the deadline) first, then vacu
 2. Add `https://github.com/salvatore-081/ha-tidy-rooms` as an **Integration**.
 3. Install **Tidy Rooms** and restart Home Assistant.
 
+Install a release: the panel and the card are built when a release is published and ship only in its zip (`tidy_rooms.zip`). Installed from a commit, the integration works without them.
+
 ### Manual
 
-Copy `custom_components/tidy_rooms` into your `config/custom_components` folder and restart Home Assistant.
+Download `tidy_rooms.zip` from the latest release, unpack it into `config/custom_components/tidy_rooms` and restart Home Assistant.
 
 ## Configuration
 
 1. **Settings → Devices & services → Add integration → Tidy Rooms**, then choose the robot vacuum.
-2. On the integration page, **Add room** for each room: area, presence sensors, targets and deadlines.
-3. **Configure** for the global settings: quiet hours, wake-up check, minimum battery, and how to drive the robot (work mode select entity and its options for "vacuum and mop" and "vacuum only", normal and quiet fan speeds).
+2. In the **Tidy Rooms** panel, **Rooms → Add room** for each room: area, presence sensors, targets and deadlines.
+3. **Settings** in the panel for quiet hours, wake-up check, minimum battery and how to drive the robot (work mode select entity and its options for "vacuum and mop" and "vacuum only", normal and quiet fan speeds).
 
-All settings can be changed later; rooms are edited from their own entry on the integration page.
+Rooms and settings can also be managed from the integration page (**Add room**, **Configure**): both edit the same configuration.
 
 ## Entities
 
@@ -87,6 +113,8 @@ Write values like `"1,2"` literally. A template that renders to `1,2` is turned 
 
 ## Development
 
+Backend:
+
 ```bash
 uv venv --python 3.14
 uv pip install "pytest-homeassistant-custom-component==0.13.375"
@@ -94,6 +122,17 @@ uv pip install "pytest-homeassistant-custom-component==0.13.375"
 ```
 
 The planning rules live in `planner.py` as pure functions, without Home Assistant, and are tested on their own.
+
+Frontend (Lit and TypeScript, built with Vite into `custom_components/tidy_rooms/frontend/`):
+
+```bash
+cd frontend
+npm ci --ignore-scripts
+npm run lint && npm run typecheck && npm test
+npm run build
+```
+
+The panel talks to the integration through its WebSocket API (`websocket_api.py`, commands `tidy_rooms/*`); the forms are the integration's own schemas, shown with Home Assistant's `ha-form`.
 
 ## License
 

@@ -1,0 +1,36 @@
+name: Release
+
+# Builds the panel and the card and attaches the integration as a zip to the
+# release: HACS (Marketplace) installs that zip (hacs.json: zip_release).
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check the version
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          manifest=$(jq -r .version custom_components/tidy_rooms/manifest.json)
+          frontend=$(jq -r .version frontend/package.json)
+          test "v$manifest" = "$tag" && test "$frontend" = "$manifest"
+      - name: Build the frontend
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+      - name: Zip the integration
+        run: cd custom_components/tidy_rooms && zip -r -X ../../tidy_rooms.zip . -x "__pycache__/*"
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" tidy_rooms.zip --clobber
