@@ -7,7 +7,7 @@ from typing import Any
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import EVENT_CALL_SERVICE
 from homeassistant.config_entries import ConfigSubentry
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 
 from custom_components.tidy_rooms.const import CONF_JOB_ENTITY, CONF_RESTORE_SETTINGS
@@ -130,6 +130,7 @@ async def test_after_an_interruption_restore_follows_return_home(
 ) -> None:
     order: list[str] = []
 
+    @callback  # in the event loop, in order (a plain function runs in a thread)
     def record(event: Event) -> None:
         order.append(f"{event.data['domain']}.{event.data['service']}")
 
