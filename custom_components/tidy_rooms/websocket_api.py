@@ -21,20 +21,27 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_AREA,
+    CONF_PASSES,
     CONF_ROOM_ORDER,
     CONF_VACUUM,
     CONF_WORK_MODE_ENTITY,
     DOMAIN,
+    MAX_PASSES,
     SUBENTRY_ROOM,
 )
 from .engine import TidyRoomsEngine, update_signal
 from .history import HISTORY_DAYS
 from .schema import (
+    PASS_DEFAULTS,
     ROOM_DEFAULTS,
+    merge_room,
+    pass_schema,
+    room_keys,
     room_schema,
     room_title,
     settings_keys,
     settings_sections,
+    validate_passes,
     validate_room,
 )
 
@@ -235,14 +242,18 @@ async def ws_schema(
     """A form for ha-form, with its current values."""
     entry = _entry(hass, msg["entry_id"])
     if msg["form"] == "room":
-        values = (
-            dict(_room(entry, msg["room_id"]).data)
-            if "room_id" in msg
-            else dict(ROOM_DEFAULTS)
-        )
+        data = dict(_room(entry, msg["room_id"]).data) if "room_id" in msg else {}
+        passes = list(data.pop(CONF_PASSES, []))
         connection.send_result(
             msg["id"],
-            {"schema": _serialize(room_schema(hass, entry)), "values": values},
+            {
+                "schema": _serialize(room_schema()),
+                "values": data or dict(ROOM_DEFAULTS),
+                "pass_schema": _serialize(pass_schema(hass, entry, passes)),
+                "pass_defaults": PASS_DEFAULTS,
+                "passes": passes,
+                "max_passes": MAX_PASSES,
+            },
         )
         return
     work_mode = msg.get("work_mode_entity", entry.options.get(CONF_WORK_MODE_ENTITY))
@@ -274,15 +285,27 @@ async def ws_schema(
 async def ws_room_save(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Add or edit a room; field errors come back in the result."""
+    """Add or edit a room; field errors come back in the result.
+
+    Without "passes" in the data the program stays as it is (an older panel
+    still cached in the browser does not send it).
+    """
     entry = _entry(hass, msg["entry_id"])
     current = _room(entry, msg["room_id"]) if "room_id" in msg else None
+    keys = room_keys()
     try:
-        data = room_schema(hass, entry)(msg["data"])
+        form = room_schema()({k: v for k, v in msg["data"].items() if k in keys})
     except vol.Invalid as err:
         connection.send_result(msg["id"], {"errors": _field_errors(err)})
         return
-    errors = validate_room(entry, data, current.subentry_id if current else None)
+    errors = validate_room(entry, form, current.subentry_id if current else None)
+    data = merge_room(dict(current.data) if current else None, form)
+    if CONF_PASSES in msg["data"]:
+        passes, pass_errors = validate_passes(
+            hass, entry, msg["data"][CONF_PASSES], data[CONF_PASSES]
+        )
+        errors.update(pass_errors)
+        data[CONF_PASSES] = passes
     if errors:
         connection.send_result(msg["id"], {"errors": errors})
         return

@@ -81,7 +81,7 @@ from .const import (
     WEEKDAYS,
 )
 from .history import JobHistory, JobRecord
-from .legacy import legacy_done, legacy_kind, legacy_program
+from .legacy import legacy_done, legacy_kind
 from .program import (
     Decision,
     GlobalConfig,
@@ -278,9 +278,7 @@ class TidyRoomsEngine:
             if sub.subentry_type != SUBENTRY_ROOM:
                 continue
             d = sub.data
-            raw_passes = d.get(CONF_PASSES)
-            if raw_passes is None:  # saved by 0.3.0, not migrated yet
-                raw_passes = legacy_program(d, opts)
+            raw_passes = d.get(CONF_PASSES) or []
             self.rooms[sub.subentry_id] = Room(
                 subentry_id=sub.subentry_id,
                 area_id=d[CONF_AREA],

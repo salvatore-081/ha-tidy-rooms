@@ -40,6 +40,7 @@ from .const import (
 )
 from .schema import (
     ROOM_DEFAULTS,
+    merge_room,
     SECTION_ROBOT,
     SECTION_SCHEDULE,
     SECTION_SIGNALS,
@@ -54,7 +55,7 @@ from .schema import (
 class TidyRoomsConfigFlow(ConfigFlow, domain=DOMAIN):
     """Create one entry per robot vacuum."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -168,17 +169,17 @@ class RoomSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             errors = validate_room(self._get_entry(), user_input, None)
             if not errors:
+                # The program is set in the Tidy Rooms panel: it starts empty.
                 return self.async_create_entry(
                     title=room_title(self.hass, user_input),
-                    data=user_input,
+                    data=merge_room(None, user_input),
                     unique_id=user_input[CONF_AREA],
                 )
 
         return self.async_show_form(
             step_id="user",
             data_schema=self.add_suggested_values_to_schema(
-                room_schema(self.hass, self._get_entry()),
-                user_input or ROOM_DEFAULTS,
+                room_schema(), user_input or ROOM_DEFAULTS
             ),
             errors=errors,
         )
@@ -196,14 +197,14 @@ class RoomSubentryFlow(ConfigSubentryFlow):
                     self._get_entry(),
                     subentry,
                     title=room_title(self.hass, user_input),
-                    data=user_input,
+                    data=merge_room(dict(subentry.data), user_input),
                     unique_id=user_input[CONF_AREA],
                 )
 
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self.add_suggested_values_to_schema(
-                room_schema(self.hass, self._get_entry()), user_input or subentry.data
+                room_schema(), user_input or subentry.data
             ),
             errors=errors,
         )

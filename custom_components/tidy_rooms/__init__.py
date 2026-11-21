@@ -6,13 +6,22 @@ from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
 from . import panel, websocket_api
-from .const import CONF_ROOM_ORDER, DOMAIN, STORAGE_VERSION
+from .const import (
+    CONF_PASSES,
+    CONF_ROOM_FAN_SPEED,
+    CONF_ROOM_ORDER,
+    DOMAIN,
+    STORAGE_VERSION,
+    SUBENTRY_ROOM,
+)
 from .engine import TidyRoomsEngine
 from .history import JobHistory
+from .legacy import LEGACY_OPTION_KEYS, LEGACY_ROOM_KEYS, legacy_program
 
 PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR, Platform.SWITCH]
 
@@ -24,6 +33,43 @@ type TidyRoomsConfigEntry = ConfigEntry[TidyRoomsEngine]
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the WebSocket API of the panel."""
     websocket_api.async_register(hass)
+    return True
+
+
+# Entities of 0.3.0 that cleaning programs replace (unique id suffixes).
+LEGACY_ENTITIES = ("clean_now_full", "clean_now_vacuum", "last_full", "last_vacuum")
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Version 1 (up to 0.3.0) to 2: counts per kind become cleaning programs.
+
+    Safe to run again after an interruption: rooms that already have a
+    program are left alone, and the version changes last.
+    """
+    if entry.version > 2:
+        return False  # saved by a newer version
+    if entry.version == 1:
+        registry = er.async_get(hass)
+        for sub in list(entry.subentries.values()):
+            if sub.subentry_type != SUBENTRY_ROOM:
+                continue
+            if CONF_PASSES not in sub.data:
+                data = {
+                    k: v
+                    for k, v in sub.data.items()
+                    if k not in LEGACY_ROOM_KEYS and k != CONF_ROOM_FAN_SPEED
+                }
+                data[CONF_PASSES] = legacy_program(sub.data, entry.options)
+                hass.config_entries.async_update_subentry(entry, sub, data=data)
+            for key in LEGACY_ENTITIES:
+                for domain in ("button", "sensor"):
+                    entity_id = registry.async_get_entity_id(
+                        domain, DOMAIN, f"{sub.subentry_id}_{key}"
+                    )
+                    if entity_id:
+                        registry.async_remove(entity_id)
+        options = {k: v for k, v in entry.options.items() if k not in LEGACY_OPTION_KEYS}
+        hass.config_entries.async_update_entry(entry, options=options, version=2)
     return True
 
 

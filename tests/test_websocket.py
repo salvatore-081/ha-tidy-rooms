@@ -91,9 +91,28 @@ async def test_room_schema_and_save(hass: HomeAssistant, freezer, hass_ws_client
     entry, kitchen, _ = await make(hass, freezer)
 
     res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
-    names = [f["name"] for f in res["result"]["schema"]]
-    assert names[0] == "area" and "clean_action" in names
-    assert res["result"]["values"][CONF_EMPTY_MINUTES] == 10
+    result = res["result"]
+    names = [f["name"] for f in result["schema"]]
+    assert names == [
+        "area",
+        "occupancy_sensors",
+        "proxy_sensors",
+        "empty_minutes",
+        "clean_action",
+    ]
+    assert result["values"][CONF_EMPTY_MINUTES] == 10
+    assert result["passes"] == []
+    assert result["pass_defaults"] == {"forced": True}
+    assert result["max_passes"] == 6
+    assert [f["name"] for f in result["pass_schema"]] == [
+        "work_mode",
+        "fan_speed",
+        "start",
+        "end",
+        "forced",
+        "gap_hours",
+        "days",
+    ]
 
     room_id = next(iter(entry.subentries))
     res = await _call(
@@ -104,58 +123,135 @@ async def test_room_schema_and_save(hass: HomeAssistant, freezer, hass_ws_client
         room_id=room_id,
     )
     assert res["result"]["values"][CONF_AREA] == kitchen.id
+    assert "passes" not in res["result"]["values"]
+    assert [p["id"] for p in res["result"]["passes"]] == ["full-1", "vacuum-1"]
 
     living = ar.async_get(hass).async_create("Living")
     data = {
         CONF_AREA: living.id,
         CONF_OCCUPANCY_SENSORS: ["binary_sensor.living"],
         CONF_EMPTY_MINUTES: 5,
-        CONF_FULL_PER_DAY: 1,
-        CONF_VACUUM_PER_DAY: 1,
-        CONF_MIN_GAP_HOURS: 6,
+        "passes": [
+            {"work_mode": "mop_after_vacuum", "end": "12:00:00", "forced": True},
+            {
+                "work_mode": "vacuum",
+                "start": "17:00:00",
+                "forced": False,
+                "gap_hours": 4,
+                "days": ["mon", "tue"],
+            },
+        ],
     }
-    # Same area as the kitchen: rejected with a field error.
-    res = await _call(
-        client,
-        type="tidy_rooms/room/save",
-        entry_id=entry.entry_id,
-        data={**data, CONF_AREA: kitchen.id},
-    )
-    assert res["result"] == {"errors": {CONF_AREA: "area_already_configured"}}
-    # Out of range: rejected by the schema.
-    res = await _call(
-        client,
-        type="tidy_rooms/room/save",
-        entry_id=entry.entry_id,
-        data={**data, CONF_FULL_PER_DAY: 9},
-    )
-    assert res["result"] == {"errors": {CONF_FULL_PER_DAY: "invalid"}}
 
-    res = await _call(client, type="tidy_rooms/room/save", entry_id=entry.entry_id, data=data)
-    new_id = res["result"]["room_id"]
-    await hass.async_block_till_done()
+    async def save(data, room_id=None):
+        extra = {"room_id": room_id} if room_id else {}
+        res = await _call(
+            client, type="tidy_rooms/room/save", entry_id=entry.entry_id, data=data, **extra
+        )
+        await hass.async_block_till_done()
+        return res["result"]
+
+    # Same area as the kitchen: rejected with a field error.
+    assert await save({**data, CONF_AREA: kitchen.id}) == {
+        "errors": {CONF_AREA: "area_already_configured"}
+    }
+    # Out of range: rejected by the schema.
+    assert await save({**data, CONF_EMPTY_MINUTES: 999}) == {
+        "errors": {CONF_EMPTY_MINUTES: "invalid"}
+    }
+
+    new_id = (await save(data))["room_id"]
     sub = entry.subentries[new_id]
     assert sub.title == "Living" and sub.subentry_type == SUBENTRY_ROOM
     assert set(entry.runtime_data.rooms) == {room_id, new_id}
+    saved = sub.data["passes"]
+    assert [p["work_mode"] for p in saved] == ["mop_after_vacuum", "vacuum"]
+    assert all(len(p["id"]) == 8 for p in saved)
+    assert saved[1] == {
+        "id": saved[1]["id"],
+        "work_mode": "vacuum",
+        "start": "17:00:00",
+        "forced": False,
+        "gap_hours": 4,
+        "days": ["mon", "tue"],
+    }
 
-    # Edit, then delete.
-    res = await _call(
-        client,
-        type="tidy_rooms/room/save",
-        entry_id=entry.entry_id,
-        room_id=new_id,
-        data={**data, CONF_EMPTY_MINUTES: 20},
-    )
-    assert res["result"] == {"room_id": new_id}
-    await hass.async_block_till_done()
+    # Edit without passes (an older panel) and with keys of 0.3.0: kept as is.
+    assert await save(
+        {CONF_AREA: living.id, CONF_EMPTY_MINUTES: 20, "full_per_day": 1}, new_id
+    ) == {"room_id": new_id}
+    sub = entry.subentries[new_id]
+    assert sub.data["passes"] == saved
+    assert CONF_OCCUPANCY_SENSORS not in sub.data  # cleared in the form
+    assert "full_per_day" not in sub.data
     assert entry.runtime_data.rooms[new_id].config.empty_minutes == 20
 
+    # Reorder: the ids follow their passes; an unknown id gets a new one.
+    swapped = [
+        {**saved[1], "start": None},
+        {**saved[0], "id": "made-up"},
+    ]
+    assert await save({CONF_AREA: living.id, CONF_EMPTY_MINUTES: 20, "passes": swapped}, new_id) == {
+        "room_id": new_id
+    }
+    again = entry.subentries[new_id].data["passes"]
+    assert again[0]["id"] == saved[1]["id"] and "start" not in again[0]
+    assert again[1]["id"] not in ("made-up", saved[0]["id"])
+
+    # Delete.
     res = await _call(
         client, type="tidy_rooms/room/delete", entry_id=entry.entry_id, room_id=new_id
     )
     assert res["success"]
     await hass.async_block_till_done()
     assert set(entry.runtime_data.rooms) == {room_id}
+
+
+@pytest.mark.parametrize(
+    ("passes", "errors"),
+    [
+        ([{"forced": True}] * 7, {"passes": "too_many_passes"}),
+        ("nope", {"passes": "invalid"}),
+        (
+            [{"forced": True, "start": "12:00:00", "end": "09:00:00"}],
+            {"passes.0.end": "end_before_start"},
+        ),
+        ([{"forced": True, "work_mode": "turbo"}], {"passes.0.work_mode": "invalid"}),
+        ([{"forced": True, "fan_speed": "turbo"}], {"passes.0.fan_speed": "invalid"}),
+        ([{"end": "12:00:00"}], {"passes.0.forced": "invalid"}),
+        (
+            [
+                {"forced": True, "start": "17:00:00"},
+                {"forced": True, "start": "09:00:00", "end": "12:00:00"},
+            ],
+            {"passes.1.start": "window_order"},
+        ),
+        (
+            [
+                {"forced": True, "end": "18:00:00", "days": ["sat"]},
+                {"forced": True, "end": "12:00:00", "days": ["mon"]},
+            ],
+            {},  # no day in common: any order
+        ),
+    ],
+)
+async def test_pass_validation(
+    hass: HomeAssistant, freezer, hass_ws_client, passes, errors
+) -> None:
+    client = await _ws(hass_ws_client, hass)
+    entry, kitchen, _ = await make(hass, freezer)
+    room_id = next(iter(entry.subentries))
+    res = await _call(
+        client,
+        type="tidy_rooms/room/save",
+        entry_id=entry.entry_id,
+        room_id=room_id,
+        data={CONF_AREA: kitchen.id, CONF_EMPTY_MINUTES: 10, "passes": passes},
+    )
+    if errors:
+        assert res["result"] == {"errors": errors}
+    else:
+        assert res["result"] == {"room_id": room_id}
 
 
 async def test_reorder_without_reload(hass: HomeAssistant, freezer, hass_ws_client) -> None:
@@ -205,12 +301,7 @@ async def test_settings(hass: HomeAssistant, freezer, hass_ws_client) -> None:
     sections = res["result"]["sections"]
     assert set(sections) == {"schedule", "wake", "signals", "robot"}
     robot = [f["name"] for f in sections["robot"]]
-    assert robot == [
-        "normal_fan_speed",
-        "quiet_fan_speed",
-        "full_mode_option",
-        "vacuum_mode_option",
-    ]
+    assert robot == ["normal_fan_speed", "quiet_fan_speed"]
     values = res["result"]["values"]
     assert values[CONF_QUIET_FAN_SPEED] == "quiet"
 
@@ -222,13 +313,11 @@ async def test_settings(hass: HomeAssistant, freezer, hass_ws_client) -> None:
         form="settings",
         work_mode_entity=None,
     )
-    assert [f["name"] for f in res["result"]["sections"]["robot"]] == robot[:2]
+    assert [f["name"] for f in res["result"]["sections"]["robot"]] == robot
 
     engine = entry.runtime_data
     new = {**values, "min_battery": 40, "wake_minutes": 15}
     new.pop(CONF_WORK_MODE_ENTITY)
-    new.pop("full_mode_option")
-    new.pop("vacuum_mode_option")
     res = await _call(client, type="tidy_rooms/settings/save", entry_id=entry.entry_id, data=new)
     assert res["result"] == {}
     await hass.async_block_till_done()
@@ -409,23 +498,17 @@ async def test_panel_missing_js(
     assert "install a release" in caplog.text
 
 
-async def test_room_form_offers_robot_settings(
+async def test_pass_form_offers_robot_settings(
     hass: HomeAssistant, freezer, hass_ws_client
 ) -> None:
     client = await _ws(hass_ws_client, hass)
     entry, _, _ = await make(hass, freezer)
-    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
-    fields = {f["name"]: f for f in res["result"]["schema"]}
-    assert fields["fan_speed"]["selector"]["select"]["options"] == ["quiet", "normal"]
-    assert fields["full_mode"]["selector"]["select"]["options"] == [
-        "vacuum",
-        "mop_after_vacuum",
-    ]
-    names = list(fields)
-    assert names.index("fan_speed") < names.index("clean_action")
-
-    # A speed the robot does not offer is rejected.
     room_id = next(iter(entry.subentries))
+    sub = entry.subentries[room_id]
+    # A work mode the robot does not offer (any more) stays among the choices.
+    passes = [{**p, "work_mode": "mop"} if p["id"] == "full-1" else p for p in sub.data["passes"]]
+    hass.config_entries.async_update_subentry(entry, sub, data={**sub.data, "passes": passes})
+    await hass.async_block_till_done()
     res = await _call(
         client,
         type="tidy_rooms/schema",
@@ -433,28 +516,20 @@ async def test_room_form_offers_robot_settings(
         form="room",
         room_id=room_id,
     )
-    data = {**res["result"]["values"], "fan_speed": "turbo"}
-    res = await _call(
-        client, type="tidy_rooms/room/save", entry_id=entry.entry_id, room_id=room_id, data=data
-    )
-    assert res["result"] == {"errors": {"fan_speed": "invalid"}}
-
-    data["fan_speed"] = "quiet"
-    res = await _call(
-        client, type="tidy_rooms/room/save", entry_id=entry.entry_id, room_id=room_id, data=data
-    )
-    assert res["result"] == {"room_id": room_id}
-    await hass.async_block_till_done()
-    passes = entry.runtime_data.rooms[room_id].config.passes
-    assert passes and all(p.fan_speed == "quiet" for p in passes)
+    fields = {f["name"]: f for f in res["result"]["pass_schema"]}
+    assert fields["fan_speed"]["selector"]["select"]["options"] == ["quiet", "normal"]
+    assert fields["work_mode"]["selector"]["select"]["options"] == [
+        "vacuum",
+        "mop_after_vacuum",
+        "mop",
+    ]
 
 
-async def test_room_form_without_work_mode_entity(
+async def test_pass_form_without_work_mode_entity(
     hass: HomeAssistant, freezer, hass_ws_client
 ) -> None:
     client = await _ws(hass_ws_client, hass)
     entry, _, _ = await make(hass, freezer, options={CONF_WORK_MODE_ENTITY: None})
     res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
-    names = [f["name"] for f in res["result"]["schema"]]
-    assert "fan_speed" in names
-    assert "full_mode" not in names and "vacuum_mode" not in names
+    names = [f["name"] for f in res["result"]["pass_schema"]]
+    assert "fan_speed" in names and "work_mode" not in names

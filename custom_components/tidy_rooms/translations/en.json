@@ -34,7 +34,7 @@
         "data_description": {
           "quiet_start": "No cleaning between start and end, not even after a deadline.",
           "wake_sensors": "On the selected days, cleaning starts only after one of these sensors has detected someone for the given minutes (for example breakfast in the kitchen). Leave empty to skip the check.",
-          "work_mode_entity": "A select entity of the robot that switches between vacuum only and vacuum and mop.",
+          "work_mode_entity": "A select entity of the robot with its work modes (vacuum, mop, …): each pass of a program chooses one.",
           "job_done_delay": "Used only without a cleaning job sensor. Robots that wash the mop go back to the dock during a job: the job counts as done only after the robot stays docked this long. A return to recharge also counts as the end.",
           "battery_entity": "For robots that report the battery in a separate sensor.",
           "finished_event": "An event entity of the robot that fires when a job ends. Event types finished and finished_with_warnings mark the job as done right away; other types mark it as stopped.",
@@ -44,15 +44,13 @@
       "robot": {
         "title": "Robot settings",
         "data": {
-          "normal_fan_speed": "Fan speed of the cleanings",
-          "quiet_fan_speed": "Fan speed while someone is in the room",
-          "full_mode_option": "Robot work mode for the vacuum and mop passes",
-          "vacuum_mode_option": "Robot work mode for the vacuum passes"
+          "normal_fan_speed": "Fan speed of the passes without their own",
+          "quiet_fan_speed": "Fan speed while someone is in the room"
         },
         "data_description": {
           "quiet_fan_speed": "Used only when a room must be cleaned after its deadline while someone is there."
         },
-        "description": "Each menu offers all the options of the robot. Rooms can use their own speed and modes."
+        "description": "Each menu offers all the options of the robot. Each pass of a room's program can use its own fan speed."
       }
     }
   },
@@ -67,36 +65,22 @@
       },
       "error": {
         "area_already_configured": "This area already has a room.",
-        "proxy_with_occupancy": "Use either the room's own sensors or the sensors of other rooms, not both.",
-        "vacuum_less_than_full": "Vacuum passes include the vacuum and mop passes: they cannot be fewer."
+        "proxy_with_occupancy": "Use either the room's own sensors or the sensors of other rooms, not both."
       },
       "step": {
         "user": {
           "title": "Add room",
-          "description": "The area must be mapped to the robot's rooms (vacuum entity settings, \"Areas\").",
+          "description": "The area must be mapped to the robot's rooms (vacuum entity settings, \"Areas\"). The cleaning program of the room (its passes) is set in the Tidy Rooms panel: a new room has none.",
           "data": {
             "area": "Area",
             "occupancy_sensors": "Presence sensors in this room",
             "proxy_sensors": "Presence sensors in other rooms",
             "empty_minutes": "Minutes empty before cleaning",
-            "full_per_day": "Vacuum and mop passes per day",
-            "vacuum_per_day": "Vacuum passes per day",
-            "min_gap_hours": "Minimum hours between two passes",
-            "full_deadline": "Deadline for vacuum and mop",
-            "vacuum_deadline": "Deadline for vacuum",
-            "fan_speed": "Fan speed in this room",
-            "full_mode": "Work mode for vacuum and mop in this room",
-            "vacuum_mode": "Work mode for vacuum only in this room",
             "clean_action": "Custom clean action (optional)"
           },
           "data_description": {
             "proxy_sensors": "For rooms without their own sensor: the room counts as free while one of these sensors detects someone elsewhere.",
-            "vacuum_per_day": "A vacuum and mop pass counts as a vacuum pass too.",
-            "full_deadline": "After this time the room is cleaned even if someone is there, with the quiet fan speed. Leave empty to never force it.",
-            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity.",
-            "fan_speed": "Empty: the speed of the global settings. The quiet speed still wins when the room is cleaned after its deadline while someone is there.",
-            "full_mode": "Empty: the mode of the global settings.",
-            "vacuum_mode": "Empty: the mode of the global settings."
+            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, work_mode, pass_id, quiet, vacuum_entity."
           }
         },
         "reconfigure": {
@@ -106,24 +90,11 @@
             "occupancy_sensors": "Presence sensors in this room",
             "proxy_sensors": "Presence sensors in other rooms",
             "empty_minutes": "Minutes empty before cleaning",
-            "full_per_day": "Vacuum and mop passes per day",
-            "vacuum_per_day": "Vacuum passes per day",
-            "min_gap_hours": "Minimum hours between two passes",
-            "full_deadline": "Deadline for vacuum and mop",
-            "vacuum_deadline": "Deadline for vacuum",
-            "fan_speed": "Fan speed in this room",
-            "full_mode": "Work mode for vacuum and mop in this room",
-            "vacuum_mode": "Work mode for vacuum only in this room",
             "clean_action": "Custom clean action (optional)"
           },
           "data_description": {
             "proxy_sensors": "For rooms without their own sensor: the room counts as free while one of these sensors detects someone elsewhere.",
-            "vacuum_per_day": "A vacuum and mop pass counts as a vacuum pass too.",
-            "full_deadline": "After this time the room is cleaned even if someone is there, with the quiet fan speed. Leave empty to never force it.",
-            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, kind (full or vacuum), quiet, vacuum_entity.",
-            "fan_speed": "Empty: the speed of the global settings. The quiet speed still wins when the room is cleaned after its deadline while someone is there.",
-            "full_mode": "Empty: the mode of the global settings.",
-            "vacuum_mode": "Empty: the mode of the global settings."
+            "clean_action": "Replaces the standard area cleaning, for robots whose integration does not support it. Variables: room, area_id, work_mode, pass_id, quiet, vacuum_entity."
           }
         }
       }

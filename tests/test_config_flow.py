@@ -10,19 +10,15 @@ from homeassistant.helpers import area_registry as ar
 from custom_components.tidy_rooms.const import (
     CONF_AREA,
     CONF_EMPTY_MINUTES,
-    CONF_FULL_MODE_OPTION,
-    CONF_FULL_PER_DAY,
     CONF_JOB_DONE_DELAY,
     CONF_MIN_BATTERY,
-    CONF_MIN_GAP_HOURS,
     CONF_NORMAL_FAN_SPEED,
     CONF_OCCUPANCY_SENSORS,
+    CONF_PASSES,
     CONF_PROXY_SENSORS,
     CONF_QUIET_FAN_SPEED,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
-    CONF_VACUUM_MODE_OPTION,
-    CONF_VACUUM_PER_DAY,
     CONF_WAKE_MINUTES,
     CONF_WORK_MODE_ENTITY,
     DOMAIN,
@@ -56,12 +52,7 @@ async def test_create_and_no_duplicates(hass: HomeAssistant) -> None:
     assert result["reason"] == "already_configured"
 
 
-ROOM = {
-    CONF_EMPTY_MINUTES: 10,
-    CONF_FULL_PER_DAY: 1,
-    CONF_VACUUM_PER_DAY: 2,
-    CONF_MIN_GAP_HOURS: 6,
-}
+ROOM = {CONF_EMPTY_MINUTES: 10}
 
 
 async def test_room_subentry(hass: HomeAssistant) -> None:
@@ -74,9 +65,6 @@ async def test_room_subentry(hass: HomeAssistant) -> None:
         )
         assert result["type"] is FlowResultType.FORM
         return await hass.config_entries.subentries.async_configure(result["flow_id"], data)
-
-    result = await add({**ROOM, CONF_AREA: kitchen.id, CONF_VACUUM_PER_DAY: 0})
-    assert result["errors"] == {CONF_VACUUM_PER_DAY: "vacuum_less_than_full"}
 
     result = await add(
         {
@@ -91,12 +79,18 @@ async def test_room_subentry(hass: HomeAssistant) -> None:
     result = await add({**ROOM, CONF_AREA: kitchen.id})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Kitchen"
+    # The program is set in the panel: it starts empty.
+    subentry = next(iter(entry.subentries.values()))
+    assert subentry.data[CONF_PASSES] == []
 
     result = await add({**ROOM, CONF_AREA: kitchen.id})
     assert result["errors"] == {CONF_AREA: "area_already_configured"}
 
-    # Edit the room.
-    subentry = next(iter(entry.subentries.values()))
+    # Edit the room: the program set in the panel is kept.
+    program = [{"id": "a1", "forced": True, "end": "12:00:00"}]
+    hass.config_entries.async_update_subentry(
+        entry, subentry, data={**subentry.data, CONF_PASSES: program}
+    )
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, SUBENTRY_ROOM),
         context={"source": "reconfigure", "subentry_id": subentry.subentry_id},
@@ -107,7 +101,9 @@ async def test_room_subentry(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
-    assert entry.subentries[subentry.subentry_id].data[CONF_EMPTY_MINUTES] == 20
+    data = entry.subentries[subentry.subentry_id].data
+    assert data[CONF_EMPTY_MINUTES] == 20
+    assert data[CONF_PASSES] == program
 
 
 async def test_options(hass: HomeAssistant) -> None:
@@ -128,13 +124,8 @@ async def test_options(hass: HomeAssistant) -> None:
     assert result["step_id"] == "robot"
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {
-            CONF_NORMAL_FAN_SPEED: "max",
-            CONF_QUIET_FAN_SPEED: "quiet",
-            CONF_FULL_MODE_OPTION: "mop",
-            CONF_VACUUM_MODE_OPTION: "vacuum",
-        },
+        {CONF_NORMAL_FAN_SPEED: "max", CONF_QUIET_FAN_SPEED: "quiet"},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options[CONF_FULL_MODE_OPTION] == "mop"
     assert entry.options[CONF_QUIET_FAN_SPEED] == "quiet"
+    assert entry.options[CONF_WORK_MODE_ENTITY] == "select.mode"

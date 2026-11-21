@@ -34,7 +34,7 @@
         "data_description": {
           "quiet_start": "Ninguna limpieza entre el inicio y el fin, ni siquiera después de una hora límite.",
           "wake_sensors": "Los días elegidos, la limpieza empieza solo después de que uno de estos sensores haya detectado a alguien durante los minutos indicados (por ejemplo el desayuno en la cocina). Déjalo vacío para no hacer la comprobación.",
-          "work_mode_entity": "Una entidad select del robot que cambia entre solo aspirar y aspirar y fregar.",
+          "work_mode_entity": "Una entidad select del robot con sus modos de trabajo (aspirar, fregar, …): cada pasada de un programa elige uno.",
           "job_done_delay": "Solo se usa sin el sensor de limpieza en curso. Los robots que lavan la mopa vuelven a la base durante una tarea: la tarea solo se da por terminada cuando el robot permanece en la base este tiempo. Una vuelta para recargar también cuenta como final.",
           "battery_entity": "Para robots que indican la batería en un sensor aparte.",
           "finished_event": "Una entidad de evento del robot que se dispara al terminar una tarea. Los tipos finished y finished_with_warnings marcan la tarea como hecha de inmediato; los demás tipos como detenida.",
@@ -44,15 +44,13 @@
       "robot": {
         "title": "Ajustes del robot",
         "data": {
-          "normal_fan_speed": "Potencia de succión en las limpiezas",
-          "quiet_fan_speed": "Potencia de succión con alguien en la habitación",
-          "full_mode_option": "Modo del robot para las pasadas de aspirar y fregar",
-          "vacuum_mode_option": "Modo del robot para las pasadas de solo aspirar"
+          "normal_fan_speed": "Potencia de las pasadas sin una propia",
+          "quiet_fan_speed": "Potencia de succión con alguien en la habitación"
         },
         "data_description": {
           "quiet_fan_speed": "Solo se usa cuando una habitación debe limpiarse después de su hora límite mientras hay alguien."
         },
-        "description": "Cada menú ofrece todas las opciones del robot. Las habitaciones pueden tener su propia potencia y sus propios modos."
+        "description": "Cada menú ofrece todas las opciones del robot. Cada pasada del programa de una habitación puede usar su propia potencia."
       }
     }
   },
@@ -67,36 +65,22 @@
       },
       "error": {
         "area_already_configured": "Esta área ya tiene una habitación.",
-        "proxy_with_occupancy": "Usa los sensores de la habitación o los de otras habitaciones, no ambos.",
-        "vacuum_less_than_full": "Las pasadas de aspirado incluyen las de fregado: no pueden ser menos."
+        "proxy_with_occupancy": "Usa los sensores de la habitación o los de otras habitaciones, no ambos."
       },
       "step": {
         "user": {
           "title": "Añadir habitación",
-          "description": "El área debe estar asociada a las habitaciones del robot (ajustes de la entidad aspirador, «Áreas»).",
+          "description": "El área debe estar asociada a las habitaciones del robot (ajustes de la entidad aspiradora, \"Áreas\"). El programa de limpieza de la habitación (sus pasadas) se configura en el panel de Tidy Rooms: una habitación nueva no tiene ninguno.",
           "data": {
             "area": "Área",
             "occupancy_sensors": "Sensores de presencia en esta habitación",
             "proxy_sensors": "Sensores de presencia en otras habitaciones",
             "empty_minutes": "Minutos vacía antes de limpiar",
-            "full_per_day": "Pasadas de aspirado y fregado al día",
-            "vacuum_per_day": "Pasadas de aspirado al día",
-            "min_gap_hours": "Horas mínimas entre dos pasadas",
-            "full_deadline": "Hora límite para aspirar y fregar",
-            "vacuum_deadline": "Hora límite para aspirar",
-            "fan_speed": "Potencia de succión en esta habitación",
-            "full_mode": "Modo para aspirar y fregar en esta habitación",
-            "vacuum_mode": "Modo para solo aspirar en esta habitación",
             "clean_action": "Acción de limpieza personalizada (opcional)"
           },
           "data_description": {
             "proxy_sensors": "Para habitaciones sin sensor propio: la habitación se considera libre mientras uno de estos sensores detecta a alguien en otro sitio.",
-            "vacuum_per_day": "Una pasada de aspirado y fregado cuenta también como pasada de aspirado.",
-            "full_deadline": "Después de esta hora la habitación se limpia aunque haya alguien, con la potencia silenciosa. Déjalo vacío para no forzarla nunca.",
-            "clean_action": "Sustituye la limpieza estándar por área, para robots cuya integración no la admite. Variables: room, area_id, kind (full o vacuum), quiet, vacuum_entity.",
-            "fan_speed": "Vacío: la potencia de los ajustes generales. La potencia silenciosa sigue teniendo prioridad cuando la habitación se limpia después de la hora límite con alguien dentro.",
-            "full_mode": "Vacío: el modo de los ajustes generales.",
-            "vacuum_mode": "Vacío: el modo de los ajustes generales."
+            "clean_action": "Sustituye la limpieza estándar del área, para robots cuya integración no la admite. Variables: room, area_id, work_mode, pass_id, quiet, vacuum_entity."
           }
         },
         "reconfigure": {
@@ -106,24 +90,11 @@
             "occupancy_sensors": "Sensores de presencia en esta habitación",
             "proxy_sensors": "Sensores de presencia en otras habitaciones",
             "empty_minutes": "Minutos vacía antes de limpiar",
-            "full_per_day": "Pasadas de aspirado y fregado al día",
-            "vacuum_per_day": "Pasadas de aspirado al día",
-            "min_gap_hours": "Horas mínimas entre dos pasadas",
-            "full_deadline": "Hora límite para aspirar y fregar",
-            "vacuum_deadline": "Hora límite para aspirar",
-            "fan_speed": "Potencia de succión en esta habitación",
-            "full_mode": "Modo para aspirar y fregar en esta habitación",
-            "vacuum_mode": "Modo para solo aspirar en esta habitación",
             "clean_action": "Acción de limpieza personalizada (opcional)"
           },
           "data_description": {
             "proxy_sensors": "Para habitaciones sin sensor propio: la habitación se considera libre mientras uno de estos sensores detecta a alguien en otro sitio.",
-            "vacuum_per_day": "Una pasada de aspirado y fregado cuenta también como pasada de aspirado.",
-            "full_deadline": "Después de esta hora la habitación se limpia aunque haya alguien, con la potencia silenciosa. Déjalo vacío para no forzarla nunca.",
-            "clean_action": "Sustituye la limpieza estándar por área, para robots cuya integración no la admite. Variables: room, area_id, kind (full o vacuum), quiet, vacuum_entity.",
-            "fan_speed": "Vacío: la potencia de los ajustes generales. La potencia silenciosa sigue teniendo prioridad cuando la habitación se limpia después de la hora límite con alguien dentro.",
-            "full_mode": "Vacío: el modo de los ajustes generales.",
-            "vacuum_mode": "Vacío: el modo de los ajustes generales."
+            "clean_action": "Sustituye la limpieza estándar del área, para robots cuya integración no la admite. Variables: room, area_id, work_mode, pass_id, quiet, vacuum_entity."
           }
         }
       }
