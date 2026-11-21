@@ -45,10 +45,12 @@
         "title": "Impostazioni del robot",
         "data": {
           "normal_fan_speed": "Potenza delle passate senza una propria",
-          "quiet_fan_speed": "Velocità della ventola con qualcuno nella stanza"
+          "quiet_fan_speed": "Velocità della ventola con qualcuno nella stanza",
+          "restore_settings": "Rimetti le impostazioni del robot dopo ogni lavoro"
         },
         "data_description": {
-          "quiet_fan_speed": "Usata solo quando una stanza va pulita dopo l'ora limite mentre c'è qualcuno."
+          "quiet_fan_speed": "Usata solo quando una stanza va pulita dopo l'ora limite mentre c'è qualcuno.",
+          "restore_settings": "Alla fine dei lavori di Tidy Rooms il robot riprende la modalità di lavoro e la potenza che aveva prima (altrimenti una pulizia avviata dalla sua app le erediterebbe). Un'impostazione cambiata da altri nel frattempo resta com'è."
         },
         "description": "Ogni menu offre tutte le opzioni del robot. Ogni passata del programma di una stanza può usare una potenza propria."
       }

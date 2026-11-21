@@ -27,6 +27,8 @@ CONF_JOB_DONE_DELAY: Final = "job_done_delay"
 CONF_BATTERY_ENTITY: Final = "battery_entity"
 CONF_FINISHED_EVENT: Final = "finished_event"
 CONF_JOB_ENTITY: Final = "job_entity"
+# Put the robot's work mode and fan speed back after Tidy Rooms' jobs
+CONF_RESTORE_SETTINGS: Final = "restore_settings"
 # Room priority, as a list of subentry ids (set from the panel)
 CONF_ROOM_ORDER: Final = "room_order"
 

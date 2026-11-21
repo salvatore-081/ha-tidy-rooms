@@ -37,6 +37,7 @@ from .const import (
     CONF_QUIET_END,
     CONF_QUIET_FAN_SPEED,
     CONF_QUIET_START,
+    CONF_RESTORE_SETTINGS,
     CONF_START,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
@@ -341,6 +342,9 @@ def settings_sections(
     if speeds := fan_speeds(hass, entry):
         robot[vol.Optional(CONF_NORMAL_FAN_SPEED)] = _dropdown(speeds)
         robot[vol.Optional(CONF_QUIET_FAN_SPEED)] = _dropdown(speeds)
+    robot[vol.Optional(CONF_RESTORE_SETTINGS, default=False)] = (
+        selector.BooleanSelector()
+    )
     sections[SECTION_ROBOT] = vol.Schema(robot)
     return sections
 
@@ -362,4 +366,5 @@ def settings_keys() -> set[str]:
         CONF_JOB_DONE_DELAY,
         CONF_NORMAL_FAN_SPEED,
         CONF_QUIET_FAN_SPEED,
+        CONF_RESTORE_SETTINGS,
     }

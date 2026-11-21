@@ -45,10 +45,12 @@
         "title": "Ajustes del robot",
         "data": {
           "normal_fan_speed": "Potencia de las pasadas sin una propia",
-          "quiet_fan_speed": "Potencia de succión con alguien en la habitación"
+          "quiet_fan_speed": "Potencia de succión con alguien en la habitación",
+          "restore_settings": "Restablecer los ajustes del robot tras cada trabajo"
         },
         "data_description": {
-          "quiet_fan_speed": "Solo se usa cuando una habitación debe limpiarse después de su hora límite mientras hay alguien."
+          "quiet_fan_speed": "Solo se usa cuando una habitación debe limpiarse después de su hora límite mientras hay alguien.",
+          "restore_settings": "Al terminar los trabajos de Tidy Rooms, el robot recupera el modo de trabajo y la potencia que tenía antes (si no, una limpieza iniciada desde su app los heredaría). Un ajuste cambiado por otra persona mientras tanto se deja como está."
         },
         "description": "Cada menú ofrece todas las opciones del robot. Cada pasada del programa de una habitación puede usar su propia potencia."
       }

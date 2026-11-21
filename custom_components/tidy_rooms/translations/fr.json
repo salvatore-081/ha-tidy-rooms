@@ -45,10 +45,12 @@
         "title": "Réglages du robot",
         "data": {
           "normal_fan_speed": "Puissance des passages sans puissance propre",
-          "quiet_fan_speed": "Puissance d'aspiration avec quelqu'un dans la pièce"
+          "quiet_fan_speed": "Puissance d'aspiration avec quelqu'un dans la pièce",
+          "restore_settings": "Rétablir les réglages du robot après chaque tâche"
         },
         "data_description": {
-          "quiet_fan_speed": "Utilisée seulement quand une pièce doit être nettoyée après son heure limite alors que quelqu'un s'y trouve."
+          "quiet_fan_speed": "Utilisée seulement quand une pièce doit être nettoyée après son heure limite alors que quelqu'un s'y trouve.",
+          "restore_settings": "À la fin des tâches de Tidy Rooms, le robot retrouve le mode de travail et la puissance qu'il avait avant (sinon un nettoyage lancé depuis son app en hériterait). Un réglage modifié par quelqu'un d'autre entre-temps reste tel quel."
         },
         "description": "Chaque menu propose toutes les options du robot. Chaque passage du programme d'une pièce peut utiliser sa propre puissance."
       }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -62,6 +63,7 @@ from .const import (
     CONF_QUIET_END,
     CONF_QUIET_FAN_SPEED,
     CONF_QUIET_START,
+    CONF_RESTORE_SETTINGS,
     CONF_ROOM_ORDER,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
@@ -106,6 +108,8 @@ from .schema import work_modes
 _LOGGER = logging.getLogger(__name__)
 
 TICK = timedelta(minutes=1)
+RESTORE_ATTEMPTS = 3
+RESTORE_RETRY = timedelta(minutes=2)
 SAVE_DELAY = 10  # seconds
 _BAD = (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
@@ -196,6 +200,52 @@ class Room:
     last_result: str | None = None  # done / interrupted / failed / stopped
 
 
+@dataclass(slots=True)
+class RobotRestore:
+    """The robot's settings before a series of jobs, to put back at the end.
+
+    `mode`/`fan` are the values to put back (None: nothing to restore);
+    `set_mode`/`set_fan` the last ones Tidy Rooms sent. A value that is
+    neither was changed by someone else: it is left alone.
+    """
+
+    mode: str | None
+    fan: str | None
+    set_mode: str | None = None
+    set_fan: str | None = None
+    pending: bool = False  # the series is over: restore when possible
+    attempts: int = 0
+    next_try: datetime | None = None
+
+    def serialize(self) -> dict[str, Any]:
+        """For the store."""
+        return {
+            "mode": self.mode,
+            "fan": self.fan,
+            "set_mode": self.set_mode,
+            "set_fan": self.set_fan,
+            "pending": self.pending,
+            "attempts": self.attempts,
+            "next_try": _iso(self.next_try),
+        }
+
+    @classmethod
+    def restore(cls, data: dict[str, Any]) -> RobotRestore | None:
+        """Inverse of serialize."""
+        try:
+            return cls(
+                mode=data.get("mode"),
+                fan=data.get("fan"),
+                set_mode=data.get("set_mode"),
+                set_fan=data.get("set_fan"),
+                pending=bool(data.get("pending")),
+                attempts=int(data.get("attempts", 0)),
+                next_try=_dt(data.get("next_try")),
+            )
+        except (TypeError, ValueError):
+            return None
+
+
 def update_signal(entry_id: str) -> str:
     """Dispatcher signal sent when anything of an entry changes."""
     return f"{DOMAIN}_{entry_id}_update"
@@ -260,6 +310,8 @@ class TidyRoomsEngine:
         self.wake_minutes = int(opts.get(CONF_WAKE_MINUTES, 0))
         self.wake_days: list[str] = list(opts.get(CONF_WAKE_DAYS) or [])
         self.work_mode_entity: str | None = opts.get(CONF_WORK_MODE_ENTITY)
+        # Put the robot's work mode and fan speed back after our jobs.
+        self.restore_settings = bool(opts.get(CONF_RESTORE_SETTINGS, False))
         self.normal_fan: str | None = opts.get(CONF_NORMAL_FAN_SPEED)
         self.quiet_fan: str | None = opts.get(CONF_QUIET_FAN_SPEED)
         self.battery_entity: str | None = opts.get(CONF_BATTERY_ENTITY)
@@ -298,6 +350,10 @@ class TidyRoomsEngine:
 
         self.enabled = True
         self.job: Job | None = None
+        self.robot_restore: RobotRestore | None = None
+        # Robot commands of a job, of a restore and of a return home must not
+        # interleave.
+        self._robot_lock = asyncio.Lock()
         self.last_plan: Plan = Plan(decision=None)
         self.awake_today = False
         self._awake_day = ""
@@ -432,6 +488,8 @@ class TidyRoomsEngine:
                     st.last_clean,
                 )
             room.last_result = saved.get("last_result")
+        if self.restore_settings and (raw := data.get("robot_restore")):
+            self.robot_restore = RobotRestore.restore(raw)
         raw = data.get("job")
         job = self._restore_job(raw) if raw else None
         if (
@@ -470,6 +528,9 @@ class TidyRoomsEngine:
             "awake_day": self._awake_day,
             "enabled": self.enabled,
             "job": self.job.serialize() if self.job else None,
+            "robot_restore": self.robot_restore.serialize()
+            if self.robot_restore
+            else None,
             "rooms": {
                 room_id: {
                     "enabled": r.state.enabled,
@@ -605,6 +666,7 @@ class TidyRoomsEngine:
         self._roll_day(now)
         self._check_job_timers(now)
         self._evaluate()
+        self._check_restore(now)
 
     @callback
     def _on_midnight(self, now: datetime) -> None:
@@ -724,6 +786,9 @@ class TidyRoomsEngine:
             )
         )
         self.job = None
+        if self.robot_restore is not None:
+            self.robot_restore.pending = True
+            self.robot_restore.next_try = None
         self._save()
         self._notify()
 
@@ -742,7 +807,7 @@ class TidyRoomsEngine:
             and self.quiet_fan
         ):
             job.quiet_applied = True
-            self.hass.async_create_task(self._async_fan(self.quiet_fan))
+            self.hass.async_create_task(self._async_quiet_fan(self.quiet_fan))
 
     # -------------------------------------------------------------- planning
 
@@ -768,6 +833,9 @@ class TidyRoomsEngine:
         self.last_plan = result
         if self.enabled and self.job is None and result.decision is not None:
             self._start_job(result.decision, now)
+        if self.job is None:
+            # No job right after the last one: the series is over.
+            self._check_restore(now)
         self._notify()
 
     def _start_job(self, decision: Decision, now: datetime, manual: bool = False) -> None:
@@ -779,6 +847,7 @@ class TidyRoomsEngine:
             manual=manual,
             day=now.date().isoformat(),
         )
+        self._capture_restore()
         self._save()
         self.job.quiet_applied = decision.quiet
         _LOGGER.info(
@@ -871,24 +940,45 @@ class TidyRoomsEngine:
             {ATTR_ENTITY_ID: self.vacuum_entity, ATTR_FAN_SPEED: speed},
         )
 
-    async def _async_return_home(self) -> None:
+    async def _async_mode(self, option: str) -> None:
         await self._async_call(
-            VACUUM_DOMAIN, SERVICE_RETURN_TO_BASE, {ATTR_ENTITY_ID: self.vacuum_entity}
+            "select",
+            "select_option",
+            {ATTR_ENTITY_ID: self.work_mode_entity, "option": option},
         )
 
-    async def _async_send_job(self, decision: Decision) -> None:
-        room = self.rooms[decision.room_id]
-        if self.work_mode_entity and decision.work_mode:
+    async def _async_quiet_fan(self, speed: str) -> None:
+        async with self._robot_lock:
+            if self.robot_restore is not None:
+                self.robot_restore.set_fan = speed
+            await self._async_fan(speed)
+
+    async def _async_return_home(self) -> None:
+        async with self._robot_lock:
             await self._async_call(
-                "select",
-                "select_option",
-                {ATTR_ENTITY_ID: self.work_mode_entity, "option": decision.work_mode},
+                VACUUM_DOMAIN,
+                SERVICE_RETURN_TO_BASE,
+                {ATTR_ENTITY_ID: self.vacuum_entity},
             )
+
+    async def _async_send_job(self, decision: Decision) -> None:
+        async with self._robot_lock:
+            await self._async_send_job_locked(decision)
+
+    async def _async_send_job_locked(self, decision: Decision) -> None:
+        room = self.rooms[decision.room_id]
+        restore = self.robot_restore
+        if self.work_mode_entity and decision.work_mode:
+            if restore is not None:
+                restore.set_mode = decision.work_mode
+            await self._async_mode(decision.work_mode)
         # Quiet (forced while someone is there) wins over the pass's own speed.
         speed = (
             self.quiet_fan if decision.quiet else (decision.fan_speed or self.normal_fan)
         )
         if speed:
+            if restore is not None:
+                restore.set_fan = speed
             await self._async_fan(speed)
         if room.script is not None:
             try:
@@ -911,6 +1001,95 @@ class TidyRoomsEngine:
             SERVICE_CLEAN_AREA,
             {ATTR_ENTITY_ID: self.vacuum_entity, "cleaning_area_id": [room.area_id]},
         )
+
+    # --------------------------------------------------------------- restore
+
+    def _current_settings(self) -> tuple[str | None, str | None]:
+        """The robot's work mode and fan speed now (None if unknown or invalid)."""
+        mode = None
+        if self.work_mode_entity:
+            state = self.hass.states.get(self.work_mode_entity)
+            if (
+                state is not None
+                and state.state not in _BAD
+                and state.state in work_modes(self.hass, self.work_mode_entity)
+            ):
+                mode = state.state
+        fan = None
+        vac = self.hass.states.get(self.vacuum_entity)
+        if vac is not None and vac.state not in _BAD:
+            speed = vac.attributes.get(ATTR_FAN_SPEED)
+            if speed and speed in (vac.attributes.get("fan_speed_list") or []):
+                fan = speed
+        return mode, fan
+
+    def _capture_restore(self) -> None:
+        """Remember the robot's settings at the start of a series of jobs."""
+        if not self.restore_settings:
+            return
+        if self.robot_restore is not None:
+            # A job right after another (or before the restore went through):
+            # the settings to put back are still those before the first one.
+            self.robot_restore.pending = False
+            self.robot_restore.attempts = 0
+            self.robot_restore.next_try = None
+            return
+        mode, fan = self._current_settings()
+        if mode is not None or fan is not None:
+            self.robot_restore = RobotRestore(mode, fan)
+
+    def _check_restore(self, now: datetime) -> None:
+        """Put the settings back, check that they took, retry a few times."""
+        restore = self.robot_restore
+        if restore is None or not restore.pending or self.job is not None:
+            return
+        vac = self.hass.states.get(self.vacuum_entity)
+        if vac is None or vac.state not in (VacuumActivity.DOCKED, VacuumActivity.IDLE):
+            return  # still on its way, or unavailable: wait
+        if self.job_entity and (
+            (js := self.hass.states.get(self.job_entity)) and js.state == STATE_ON
+        ):
+            return  # a job started elsewhere: wait for it to end
+        if restore.next_try is not None and now < restore.next_try:
+            return
+        mode, fan = self._current_settings()
+        todo_mode = (
+            restore.mode
+            if restore.mode is not None
+            and mode != restore.mode
+            and mode == restore.set_mode  # otherwise changed by someone else
+            else None
+        )
+        todo_fan = (
+            restore.fan
+            if restore.fan is not None and fan != restore.fan and fan == restore.set_fan
+            else None
+        )
+        if todo_mode is None and todo_fan is None:
+            self.robot_restore = None  # done, or nothing left that is ours
+            self._save()
+            return
+        if restore.attempts >= RESTORE_ATTEMPTS:
+            _LOGGER.warning(
+                "Could not put the robot's settings back (%s): giving up",
+                ", ".join(x for x in (todo_mode, todo_fan) if x),
+            )
+            self.robot_restore = None
+            self._save()
+            return
+        restore.attempts += 1
+        restore.next_try = now + RESTORE_RETRY
+        self._save()
+        self.hass.async_create_task(self._async_send_restore(todo_mode, todo_fan))
+
+    async def _async_send_restore(self, mode: str | None, fan: str | None) -> None:
+        async with self._robot_lock:
+            if self.job is not None:
+                return  # a job started meanwhile: it will restore at its end
+            if mode is not None:
+                await self._async_mode(mode)
+            if fan is not None:
+                await self._async_fan(fan)
 
     # ---------------------------------------------------------------- output
 
@@ -954,6 +1133,9 @@ class TidyRoomsEngine:
             "min_battery": quiet.min_battery,
             "work_mode_entity": self.work_mode_entity,
             "work_modes": work_modes(self.hass, self.work_mode_entity),
+            "restore_settings": self.restore_settings,
+            "restore_pending": self.robot_restore is not None
+            and self.robot_restore.pending,
             "normal_fan_speed": self.normal_fan,
             "quiet_fan_speed": self.quiet_fan,
             "paused_until": _iso(self._failed_until)

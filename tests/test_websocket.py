@@ -301,7 +301,7 @@ async def test_settings(hass: HomeAssistant, freezer, hass_ws_client) -> None:
     sections = res["result"]["sections"]
     assert set(sections) == {"schedule", "wake", "signals", "robot"}
     robot = [f["name"] for f in sections["robot"]]
-    assert robot == ["normal_fan_speed", "quiet_fan_speed"]
+    assert robot == ["normal_fan_speed", "quiet_fan_speed", "restore_settings"]
     values = res["result"]["values"]
     assert values[CONF_QUIET_FAN_SPEED] == "quiet"
 

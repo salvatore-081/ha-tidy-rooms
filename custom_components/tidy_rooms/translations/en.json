@@ -45,10 +45,12 @@
         "title": "Robot settings",
         "data": {
           "normal_fan_speed": "Fan speed of the passes without their own",
-          "quiet_fan_speed": "Fan speed while someone is in the room"
+          "quiet_fan_speed": "Fan speed while someone is in the room",
+          "restore_settings": "Put the robot's settings back after each job"
         },
         "data_description": {
-          "quiet_fan_speed": "Used only when a room must be cleaned after its deadline while someone is there."
+          "quiet_fan_speed": "Used only when a room must be cleaned after its deadline while someone is there.",
+          "restore_settings": "At the end of Tidy Rooms' jobs, the robot gets back the work mode and fan speed it had before (a cleaning started from its app would otherwise inherit them). A setting changed by someone else in the meantime is left as it is."
         },
         "description": "Each menu offers all the options of the robot. Each pass of a room's program can use its own fan speed."
       }

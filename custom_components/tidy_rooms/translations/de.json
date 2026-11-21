@@ -45,10 +45,12 @@
         "title": "Robotereinstellungen",
         "data": {
           "normal_fan_speed": "Saugstärke der Durchgänge ohne eigene",
-          "quiet_fan_speed": "Saugstufe, wenn jemand im Raum ist"
+          "quiet_fan_speed": "Saugstufe, wenn jemand im Raum ist",
+          "restore_settings": "Einstellungen des Roboters nach jedem Auftrag zurücksetzen"
         },
         "data_description": {
-          "quiet_fan_speed": "Nur verwendet, wenn ein Raum nach seiner Frist gereinigt werden muss, während jemand da ist."
+          "quiet_fan_speed": "Nur verwendet, wenn ein Raum nach seiner Frist gereinigt werden muss, während jemand da ist.",
+          "restore_settings": "Am Ende der Aufträge von Tidy Rooms erhält der Roboter den Arbeitsmodus und die Saugstärke zurück, die er vorher hatte (sonst würde eine in seiner App gestartete Reinigung sie übernehmen). Eine zwischenzeitlich von jemand anderem geänderte Einstellung bleibt, wie sie ist."
         },
         "description": "Jedes Menü bietet alle Optionen des Roboters. Jeder Durchgang im Programm eines Raums kann eine eigene Saugstärke verwenden."
       }
