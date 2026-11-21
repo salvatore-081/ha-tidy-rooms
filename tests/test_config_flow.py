@@ -115,7 +115,6 @@ async def test_options(hass: HomeAssistant) -> None:
         result["flow_id"],
         {
             CONF_WAKE_MINUTES: 15,
-            CONF_MIN_BATTERY: 30,
             CONF_WORK_MODE_ENTITY: "select.mode",
             CONF_START_TIMEOUT: 3,
             CONF_JOB_DONE_DELAY: 5,
@@ -124,8 +123,9 @@ async def test_options(hass: HomeAssistant) -> None:
     assert result["step_id"] == "robot"
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {CONF_NORMAL_FAN_SPEED: "max", CONF_QUIET_FAN_SPEED: "quiet"},
+        {CONF_MIN_BATTERY: 30, CONF_NORMAL_FAN_SPEED: "max", CONF_QUIET_FAN_SPEED: "quiet"},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_QUIET_FAN_SPEED] == "quiet"
+    assert entry.options[CONF_MIN_BATTERY] == 30
     assert entry.options[CONF_WORK_MODE_ENTITY] == "select.mode"

@@ -4,7 +4,7 @@ import "../src/components/tr-robot-card";
 import "../src/components/tr-timeline";
 import "../src/components/tr-program-editor";
 import { choiceDialog } from "../src/components/tr-confirm";
-import { passErrors, passSummary } from "../src/components/tr-program-editor";
+import { passErrors, passSummary, windowInDnd } from "../src/components/tr-program-editor";
 import { quietRanges } from "../src/components/tr-timeline";
 import { formatContext } from "../src/format";
 import { localizer } from "../src/localize";
@@ -85,7 +85,7 @@ describe("robot card", () => {
     expect(text).toContain("87%");
     expect(text).toContain("No job running");
     expect(text).toContain("Next: Cucina");
-    expect(text).toContain("Quiet hours 22:30–08:00");
+    expect(text).toContain("Do not disturb 22:30–08:00");
   });
 });
 
@@ -150,6 +150,15 @@ describe("program editor", () => {
     expect(passSummary({ work_mode: "vacuum", start: "17:00:00", days: ["sat", "sun"] }, ctx)).toBe(
       "Vacuum · from 17:00 · Sat, Sun",
     );
+  });
+
+  it("warns about windows within do not disturb", () => {
+    const q = ["22:30:00", "07:00:00"] as const;
+    expect(windowInDnd({ start: "23:00:00", end: "23:59:00" }, ...q)).toBe(true);
+    expect(windowInDnd({ end: "06:00:00" }, ...q)).toBe(true);
+    expect(windowInDnd({ end: "08:00:00" }, ...q)).toBe(false);
+    expect(windowInDnd({}, ...q)).toBe(false);
+    expect(windowInDnd({ end: "06:00:00" }, null, null)).toBe(false);
   });
 
   it("adds, moves and removes passes", async () => {

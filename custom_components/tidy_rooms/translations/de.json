@@ -16,14 +16,13 @@
   "options": {
     "step": {
       "init": {
-        "title": "Zeitplan",
+        "title": "Nicht stören",
         "data": {
-          "quiet_start": "Beginn der Ruhezeit",
-          "quiet_end": "Ende der Ruhezeit",
+          "quiet_start": "Nicht stören ab",
+          "quiet_end": "Nicht stören bis",
           "wake_sensors": "Aufwach-Sensoren",
           "wake_minutes": "Minuten Anwesenheit, um als wach zu gelten",
           "wake_days": "Tage mit Aufwach-Prüfung",
-          "min_battery": "Mindestakkustand zum Starten",
           "work_mode_entity": "Auswahl des Arbeitsmodus (optional)",
           "start_timeout": "Minuten Wartezeit auf den Start vor einem neuen Versuch",
           "job_done_delay": "Minuten in der Station, bis ein Auftrag als erledigt gilt",
@@ -32,7 +31,7 @@
           "job_entity": "Sensor „Reinigung läuft“ (empfohlen)"
         },
         "data_description": {
-          "quiet_start": "Keine Reinigung zwischen Beginn und Ende, auch nicht nach einer Frist.",
+          "quiet_start": "Der Roboter startet zwischen diesen beiden Zeiten nie, auch nicht für einen erzwungenen Durchgang; Durchgänge ohne Startzeit beginnen an deren Ende.",
           "wake_sensors": "An den gewählten Tagen beginnt die Reinigung erst, wenn einer dieser Sensoren für die angegebenen Minuten jemanden erkannt hat (zum Beispiel beim Frühstück in der Küche). Leer lassen, um die Prüfung zu überspringen.",
           "work_mode_entity": "Eine Select-Entität des Roboters mit seinen Arbeitsmodi (Saugen, Wischen, …): Jeder Durchgang eines Programms wählt einen davon.",
           "job_done_delay": "Nur ohne Sensor „Reinigung läuft“ verwendet. Roboter, die den Wischmopp waschen, kehren während eines Auftrags zur Station zurück: Der Auftrag gilt erst als erledigt, wenn der Roboter so lange in der Station bleibt. Auch eine Rückkehr zum Laden zählt als Ende.",
@@ -46,7 +45,8 @@
         "data": {
           "normal_fan_speed": "Saugstärke der Durchgänge ohne eigene",
           "quiet_fan_speed": "Saugstufe, wenn jemand im Raum ist",
-          "restore_settings": "Einstellungen des Roboters nach jedem Auftrag zurücksetzen"
+          "restore_settings": "Einstellungen des Roboters nach jedem Auftrag zurücksetzen",
+          "min_battery": "Mindestakkustand zum Starten"
         },
         "data_description": {
           "quiet_fan_speed": "Nur verwendet, wenn ein Raum nach seiner Frist gereinigt werden muss, während jemand da ist.",
@@ -134,7 +134,7 @@
           "waiting_window": "Nächster Durchgang später (Zeitfenster)",
           "waiting_gap": "Nächster Durchgang später",
           "waiting_occupied": "Wartet, bis der Raum leer ist",
-          "waiting_quiet_hours": "Ruhezeit",
+          "waiting_quiet_hours": "Nicht stören",
           "waiting_awake": "Wartet auf das Aufwachen",
           "waiting_robot": "Wartet auf den Roboter",
           "ready": "Bereit",

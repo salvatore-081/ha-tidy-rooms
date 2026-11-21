@@ -4,7 +4,8 @@ import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import { confirmDialog } from "./tr-confirm";
-import { type FormatContext, formatClock } from "../format";
+import { type FormatContext, clockMinutes, formatClock } from "../format";
+import { quietRanges } from "./tr-timeline";
 import { formCallbacks } from "../form";
 import { shared, tokens } from "../styles";
 import type { FormField, HomeAssistant, PassData } from "../types";
@@ -20,6 +21,24 @@ export const passErrors = (
       .filter(([key]) => key.startsWith(prefix))
       .map(([key, value]) => [key.slice(prefix.length), value]),
   );
+};
+
+/** True if the pass's window falls entirely within do not disturb (it can never run). */
+export const windowInDnd = (
+  p: PassData,
+  quietStart: string | null,
+  quietEnd: string | null,
+): boolean => {
+  const ranges = quietRanges(quietStart, quietEnd);
+  if (!ranges.length) return false;
+  const start = clockMinutes(p.start as string | undefined) ?? 0;
+  const end = clockMinutes(p.end as string | undefined) ?? 24 * 60;
+  if (start >= end) return false;
+  // Every minute of [start, end) inside one of the ranges?
+  let at = start;
+  for (const [a, b] of ranges) if (a <= at && at < b) at = b;
+  for (const [a, b] of ranges) if (a <= at && at < b) at = b;
+  return at >= end;
 };
 
 /** Times without seconds: a pass works to the minute. */
@@ -59,6 +78,9 @@ export class TrProgramEditor extends LitElement {
   @property({ attribute: false }) defaults: Record<string, unknown> = {};
   @property({ attribute: false }) errors: Record<string, string> = {};
   @property({ type: Number }) max = 6;
+  /** Do not disturb, to warn about windows that can never run. */
+  @property({ attribute: false }) quietStart: string | null = null;
+  @property({ attribute: false }) quietEnd: string | null = null;
   @property({ type: Boolean }) disabled = false;
 
   static styles = [
@@ -118,6 +140,18 @@ export class TrProgramEditor extends LitElement {
       .error-text {
         margin: 0 0 12px;
         color: var(--error-color, #db4437);
+      }
+      .warning {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin: 0 16px 8px;
+        color: var(--warning-color, #ffa600);
+        font-size: 0.9rem;
+      }
+      .warning ha-icon {
+        --mdc-icon-size: 18px;
+        flex: none;
       }
     `,
   ];
@@ -183,6 +217,13 @@ export class TrProgramEditor extends LitElement {
           <ha-icon icon="mdi:delete-outline"></ha-icon>
         </button>
       </summary>
+      ${
+        windowInDnd(p, this.quietStart, this.quietEnd)
+          ? html`<div class="warning" role="note">
+              <ha-icon icon="mdi:alert-outline"></ha-icon>${t("program.window_in_dnd")}
+            </div>`
+          : nothing
+      }
       <div class="body">
         <ha-form
           .hass=${this.hass}

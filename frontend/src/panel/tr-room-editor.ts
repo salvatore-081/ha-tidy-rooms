@@ -357,6 +357,8 @@ export class TrRoomEditor extends LitElement {
           .defaults=${this._passDefaults}
           .errors=${errors}
           .max=${this._maxPasses}
+          .quietStart=${s.quiet_start}
+          .quietEnd=${s.quiet_end}
           .disabled=${this._saving}
           @passes-changed=${(ev: CustomEvent<{ passes: PassData[] }>) =>
             (this._passes = ev.detail.passes)}

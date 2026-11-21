@@ -16,14 +16,13 @@
   "options": {
     "step": {
       "init": {
-        "title": "Orari",
+        "title": "Non disturbare",
         "data": {
-          "quiet_start": "Inizio delle ore di silenzio",
-          "quiet_end": "Fine delle ore di silenzio",
+          "quiet_start": "Non disturbare dalle",
+          "quiet_end": "Non disturbare fino alle",
           "wake_sensors": "Sensori del risveglio",
           "wake_minutes": "Minuti di presenza per considerarvi svegli",
           "wake_days": "Giorni con il controllo del risveglio",
-          "min_battery": "Batteria minima per partire",
           "work_mode_entity": "Selettore della modalità di lavoro (facoltativo)",
           "start_timeout": "Minuti di attesa della partenza prima di riprovare",
           "job_done_delay": "Minuti in base prima di considerare finita la pulizia",
@@ -32,7 +31,7 @@
           "job_entity": "Sensore della pulizia in corso (consigliato)"
         },
         "data_description": {
-          "quiet_start": "Nessuna pulizia fra inizio e fine, nemmeno dopo un'ora limite.",
+          "quiet_start": "Il robot non parte mai fra queste due ore, nemmeno per una passata forzata; le passate senza un orario di inizio partono dalla fine.",
           "wake_sensors": "Nei giorni scelti le pulizie partono solo dopo che uno di questi sensori ha rilevato qualcuno per i minuti indicati (per esempio la colazione in cucina). Lascia vuoto per non fare il controllo.",
           "work_mode_entity": "Un'entità select del robot con le sue modalità di lavoro (aspirazione, lavaggio, …): ogni passata di un programma ne sceglie una.",
           "job_done_delay": "Usato solo senza il sensore della pulizia in corso. I robot che lavano il mocio tornano in base durante la pulizia: la pulizia è finita solo dopo che il robot resta in base per questo tempo. Anche un rientro per ricaricare conta come fine.",
@@ -46,7 +45,8 @@
         "data": {
           "normal_fan_speed": "Potenza delle passate senza una propria",
           "quiet_fan_speed": "Velocità d'aspirazione con qualcuno nella stanza",
-          "restore_settings": "Rimetti le impostazioni del robot dopo ogni lavoro"
+          "restore_settings": "Rimetti le impostazioni del robot dopo ogni lavoro",
+          "min_battery": "Batteria minima per partire"
         },
         "data_description": {
           "quiet_fan_speed": "Usata solo quando una stanza va pulita dopo l'ora limite mentre c'è qualcuno.",
@@ -134,7 +134,7 @@
           "waiting_window": "Prossima passata più tardi (finestra)",
           "waiting_gap": "Prossima passata più tardi",
           "waiting_occupied": "In attesa che la stanza sia vuota",
-          "waiting_quiet_hours": "Ore di silenzio",
+          "waiting_quiet_hours": "Non disturbare",
           "waiting_awake": "In attesa del risveglio",
           "waiting_robot": "In attesa del robot",
           "ready": "Pronta",

@@ -16,14 +16,13 @@
   "options": {
     "step": {
       "init": {
-        "title": "Horaires",
+        "title": "Ne pas déranger",
         "data": {
-          "quiet_start": "Début des heures calmes",
-          "quiet_end": "Fin des heures calmes",
+          "quiet_start": "Ne pas déranger à partir de",
+          "quiet_end": "Ne pas déranger jusqu'à",
           "wake_sensors": "Capteurs de réveil",
           "wake_minutes": "Minutes de présence pour considérer le foyer réveillé",
           "wake_days": "Jours avec la vérification du réveil",
-          "min_battery": "Batterie minimale pour démarrer",
           "work_mode_entity": "Sélecteur du mode de travail (facultatif)",
           "start_timeout": "Minutes d'attente du démarrage avant de réessayer",
           "job_done_delay": "Minutes sur la base avant de considérer la tâche terminée",
@@ -32,7 +31,7 @@
           "job_entity": "Capteur de nettoyage en cours (recommandé)"
         },
         "data_description": {
-          "quiet_start": "Aucun nettoyage entre le début et la fin, même après une heure limite.",
+          "quiet_start": "Le robot ne démarre jamais entre ces deux heures, même pour un passage forcé ; les passages sans heure de début commencent à la fin.",
           "wake_sensors": "Les jours choisis, le nettoyage ne commence qu'après que l'un de ces capteurs a détecté quelqu'un pendant le nombre de minutes indiqué (par exemple le petit-déjeuner dans la cuisine). Laissez vide pour ne pas faire la vérification.",
           "work_mode_entity": "Une entité select du robot avec ses modes de travail (aspiration, lavage, …) : chaque passage d'un programme en choisit un.",
           "job_done_delay": "Utilisé seulement sans capteur de nettoyage en cours. Les robots qui lavent la serpillière retournent à la base pendant une tâche : la tâche n'est terminée qu'après que le robot reste sur la base aussi longtemps. Un retour pour recharger compte aussi comme fin.",
@@ -46,7 +45,8 @@
         "data": {
           "normal_fan_speed": "Puissance des passages sans puissance propre",
           "quiet_fan_speed": "Puissance d'aspiration avec quelqu'un dans la pièce",
-          "restore_settings": "Rétablir les réglages du robot après chaque tâche"
+          "restore_settings": "Rétablir les réglages du robot après chaque tâche",
+          "min_battery": "Batterie minimale pour démarrer"
         },
         "data_description": {
           "quiet_fan_speed": "Utilisée seulement quand une pièce doit être nettoyée après son heure limite alors que quelqu'un s'y trouve.",
@@ -134,7 +134,7 @@
           "waiting_window": "Prochain passage plus tard (créneau)",
           "waiting_gap": "Prochain passage plus tard",
           "waiting_occupied": "En attente que la pièce soit vide",
-          "waiting_quiet_hours": "Heures calmes",
+          "waiting_quiet_hours": "Ne pas déranger",
           "waiting_awake": "En attente du réveil",
           "waiting_robot": "En attente du robot",
           "ready": "Prête",

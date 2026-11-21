@@ -298,11 +298,6 @@ def settings_sections(
             {
                 vol.Optional(CONF_QUIET_START): selector.TimeSelector(),
                 vol.Optional(CONF_QUIET_END): selector.TimeSelector(),
-                vol.Required(CONF_MIN_BATTERY): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=0, max=100, step=5, unit_of_measurement="%"
-                    )
-                ),
             }
         ),
         SECTION_WAKE: vol.Schema(
@@ -338,7 +333,11 @@ def settings_sections(
         ),
     }
 
-    robot: dict[vol.Marker, Any] = {}
+    robot: dict[vol.Marker, Any] = {
+        vol.Required(CONF_MIN_BATTERY): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0, max=100, step=5, unit_of_measurement="%")
+        )
+    }
     if speeds := fan_speeds(hass, entry):
         robot[vol.Optional(CONF_NORMAL_FAN_SPEED)] = _dropdown(speeds)
         robot[vol.Optional(CONF_QUIET_FAN_SPEED)] = _dropdown(speeds)
