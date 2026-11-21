@@ -87,7 +87,32 @@ describe("robot card", () => {
     expect(text).toContain("87%");
     expect(text).toContain("No job running");
     expect(text).toContain("Next: Cucina");
-    expect(text).toContain("Do not disturb 22:30–08:00");
+    // 10:00, awake, battery 87%: nothing holds the robot back.
+    expect(text).not.toContain("Do not disturb");
+    expect(text).not.toContain("Battery");
+  });
+
+  it("says what holds the robot back now", async () => {
+    const night = formatContext(hass("en"), localizer("en"), new Date("2026-01-12T06:30:00+01:00"));
+    const el = document.createElement("tr-robot-card");
+    Object.assign(el, {
+      hass: hass("en"),
+      snapshot: snapshot({ robot: { ...snapshot().robot, battery: 12 } }),
+      ctx: night,
+      admin: true,
+    });
+    const root = await mount(el);
+    const text = root.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("Do not disturb until 08:00");
+    expect(text).toContain("Battery 12%: starts again above 30%");
+    expect(text).not.toContain("Waiting for the wake-up");
+
+    el.ctx = ctx; // 10:00
+    el.snapshot = snapshot({ wake_check_today: true, awake: false });
+    await el.updateComplete;
+    const day = root.textContent!.replace(/\s+/g, " ");
+    expect(day).toContain("Waiting for the wake-up");
+    expect(day).not.toContain("Do not disturb");
   });
 });
 

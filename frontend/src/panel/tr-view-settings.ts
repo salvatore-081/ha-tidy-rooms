@@ -5,6 +5,7 @@ import { LitElement, type PropertyValues, css, html, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
 import { errorMessage, fetchSettingsForm, saveSettings } from "../api";
 import type { FormatContext } from "../format";
+import { withoutSeconds } from "../components/tr-program-editor";
 import { formCallbacks, labelRobotOptions, splitErrors } from "../form";
 import { notify } from "../nav";
 import { shared, tokens } from "../styles";
@@ -132,7 +133,7 @@ export class TrViewSettings extends LitElement {
         }
         if (key === "signals") schema = schema.filter((f) => f.name !== WORK_MODE);
         schema = labelRobotOptions(
-          schema,
+          withoutSeconds(schema),
           this.hass,
           this.snapshot.robot.entity_id,
           this._data[WORK_MODE] as string | undefined,

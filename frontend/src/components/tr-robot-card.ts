@@ -6,8 +6,10 @@ import { property } from "lit/decorators.js";
 import "./tr-switch";
 import { callAction, errorMessage } from "../api";
 import { notify } from "../nav";
+import { quietRanges } from "./tr-timeline";
 import {
   type FormatContext,
+  dayMinutes,
   formatClock,
   formatDuration,
   formatTime,
@@ -262,23 +264,34 @@ export class TrRobotCard extends LitElement {
     </div>`;
   }
 
+  /** Lines that say why the robot is held back now: do not disturb, wake-up, battery. */
   private _schedule() {
     const s = this.snapshot;
     const { t } = this.ctx;
-    const parts: string[] = [];
-    if (s.quiet_start && s.quiet_end)
-      parts.push(
-        t("robot.quiet_hours", {
-          start: formatClock(s.quiet_start, this.ctx),
-          end: formatClock(s.quiet_end, this.ctx),
-        }),
-      );
-    if (s.wake_check_today) parts.push(s.awake ? t("robot.awake") : t("robot.not_awake"));
-    parts.push(t("robot.min_battery", { n: s.min_battery }));
-    return html`<div class="line">
-      <ha-icon icon="mdi:clock-outline"></ha-icon>
-      <div class="text secondary">${parts.join(" · ")}</div>
-    </div>`;
+    const lines: { icon: string; text: string }[] = [];
+    const now = dayMinutes(this.ctx.now, this.ctx);
+    const dnd =
+      now !== null && quietRanges(s.quiet_start, s.quiet_end).some(([a, b]) => a <= now && now < b);
+    if (dnd)
+      lines.push({
+        icon: "mdi:bell-sleep-outline",
+        text: t("robot.dnd_until", { time: formatClock(s.quiet_end, this.ctx) }),
+      });
+    else if (s.wake_check_today && !s.awake)
+      lines.push({ icon: "mdi:weather-sunset-up", text: t("robot.waiting_wake") });
+    const battery = s.robot.battery;
+    if (battery !== null && battery < s.min_battery)
+      lines.push({
+        icon: "mdi:battery-alert-variant-outline",
+        text: t("robot.battery_low", { battery, min: s.min_battery }),
+      });
+    return lines.map(
+      (l) =>
+        html`<div class="line">
+          <ha-icon .icon=${l.icon}></ha-icon>
+          <div class="text">${l.text}</div>
+        </div>`,
+    );
   }
 
   /** The robot's own commands: back to the dock, locate, and the buttons of its device. */
