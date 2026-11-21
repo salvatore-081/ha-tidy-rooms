@@ -29,7 +29,6 @@ from .const import (
 )
 from .engine import TidyRoomsEngine, update_signal
 from .history import HISTORY_DAYS
-from .planner import CleanKind
 from .schema import (
     ROOM_DEFAULTS,
     room_schema,
@@ -426,7 +425,8 @@ async def ws_set_enabled(
         vol.Required("type"): "tidy_rooms/clean_now",
         vol.Required("entry_id"): str,
         vol.Required("room_id"): str,
-        vol.Optional("kind"): vol.In([k.value for k in CleanKind]),
+        # Absent: the next pass's work mode. None: leave the robot's mode.
+        vol.Optional("work_mode"): vol.Any(str, None),
     }
 )
 @websocket_api.async_response
@@ -438,8 +438,12 @@ async def ws_clean_now(
     engine = _engine(hass, msg["entry_id"])
     if msg["room_id"] not in engine.rooms:
         raise _Error(ERR_NOT_FOUND, "Unknown room")
-    kind = CleanKind(msg["kind"]) if "kind" in msg else None
-    await engine.async_clean_now(msg["room_id"], kind)
+    if "work_mode" in msg:
+        await engine.async_clean_now(
+            msg["room_id"], msg["work_mode"], use_default=False
+        )
+    else:
+        await engine.async_clean_now(msg["room_id"])
     connection.send_result(msg["id"])
 
 

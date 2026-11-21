@@ -9,7 +9,7 @@ the vacuum-only ones with the gap, all forced at their deadline.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -52,27 +52,25 @@ LEGACY_OPTION_KEYS = (CONF_FULL_MODE_OPTION, CONF_VACUUM_MODE_OPTION)
 
 
 def new_pass_id() -> str:
-    """A short id, stable for the life of the pass."""
+    """A short id for a new pass, stable for the life of the pass."""
     return uuid4().hex[:8]
 
 
 def legacy_program(
-    room: Mapping[str, Any],
-    options: Mapping[str, Any],
-    new_id: Callable[[], str] = new_pass_id,
+    room: Mapping[str, Any], options: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
     """The program equivalent to the counts and deadlines of a 0.3.0 room.
 
-    The pass dicts carry a private "_kind" key ("full"/"vacuum"), used to
-    convert the saved counts; `strip_kinds` removes it before saving.
+    The pass ids tell the old kind ("full-1", "vacuum-1", …): the saved counts
+    of today and a job saved by 0.3.0 are converted with them.
     """
     full = int(room.get(CONF_FULL_PER_DAY, 0) or 0)
     vacuum = max(int(room.get(CONF_VACUUM_PER_DAY, 0) or 0) - full, 0)
     fan = room.get(CONF_ROOM_FAN_SPEED) or None
     gap = float(room.get(CONF_MIN_GAP_HOURS, 0) or 0)
 
-    def one(kind: str, mode: str | None, end: str | None, gap_hours: float) -> dict:
-        p: dict[str, Any] = {CONF_PASS_ID: new_id(), CONF_FORCED: True, "_kind": kind}
+    def one(pass_id: str, mode: str | None, end: str | None, gap_hours: float) -> dict:
+        p: dict[str, Any] = {CONF_PASS_ID: pass_id, CONF_FORCED: True}
         if mode:
             p[CONF_WORK_MODE] = mode
         if fan:
@@ -88,42 +86,40 @@ def legacy_program(
         CONF_VACUUM_MODE_OPTION
     )
     return [
-        one(KIND_FULL, full_mode, room.get(CONF_FULL_DEADLINE), 0) for _ in range(full)
+        one(f"{KIND_FULL}-{n}", full_mode, room.get(CONF_FULL_DEADLINE), 0)
+        for n in range(1, full + 1)
     ] + [
-        one(KIND_VACUUM, vacuum_mode, room.get(CONF_VACUUM_DEADLINE), gap)
-        for _ in range(vacuum)
+        one(f"{KIND_VACUUM}-{n}", vacuum_mode, room.get(CONF_VACUUM_DEADLINE), gap)
+        for n in range(1, vacuum + 1)
     ]
 
 
-def strip_kinds(passes: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The passes as saved, without the private "_kind" key."""
-    return [{k: v for k, v in p.items() if k != "_kind"} for p in passes]
+def legacy_kind(pass_id: str | None) -> str | None:
+    """The 0.3.0 kind of a converted pass, from its id."""
+    kind, _, number = (pass_id or "").partition("-")
+    return kind if kind in (KIND_FULL, KIND_VACUUM) and number.isdigit() else None
 
 
 def legacy_done(
-    passes: list[dict[str, Any]],
+    pass_ids: Sequence[str],
     full_today: int,
     vacuum_today: int,
     last: datetime | None,
 ) -> list[PassDone]:
     """Today's passes done, from the 0.3.0 counts (a full pass counted twice).
 
-    Only the time of the last one is known: it goes on the last pass marked.
-    They count as manual: 0.3.0 had no order between passes (a "clean now"
-    button could do a vacuum pass before the full one), so they must not skip
-    the earlier passes still due.
+    `pass_ids` are the ids of the room's program; only converted passes
+    ("full-1", "vacuum-1", …) are marked. Only the time of the last one is
+    known: it goes on the last pass marked. They count as manual: 0.3.0 had
+    no order between passes (a "clean now" button could do a vacuum pass
+    before the full one), so they must not skip the earlier passes still due.
     """
-    full_ids = [p[CONF_PASS_ID] for p in passes if p.get("_kind") == KIND_FULL]
-    vacuum_ids = [p[CONF_PASS_ID] for p in passes if p.get("_kind") == KIND_VACUUM]
-    done_full = full_ids[: max(full_today, 0)]
-    done_vacuum = vacuum_ids[: max(vacuum_today - full_today, 0)]
-    ids = done_full + done_vacuum
+    full_ids = [p for p in pass_ids if legacy_kind(p) == KIND_FULL]
+    vacuum_ids = [p for p in pass_ids if legacy_kind(p) == KIND_VACUUM]
+    ids = (
+        full_ids[: max(full_today, 0)] + vacuum_ids[: max(vacuum_today - full_today, 0)]
+    )
     return [
         PassDone(pass_id, last if i == len(ids) - 1 else None, manual=True)
         for i, pass_id in enumerate(ids)
     ]
-
-
-def legacy_kind(passes: list[dict[str, Any]], pass_id: str | None) -> str | None:
-    """The 0.3.0 kind of a converted pass."""
-    return next((p.get("_kind") for p in passes if p[CONF_PASS_ID] == pass_id), None)

@@ -52,28 +52,19 @@ from .const import (
     CONF_CLEAN_ACTION,
     CONF_EMPTY_MINUTES,
     CONF_FINISHED_EVENT,
-    CONF_FULL_DEADLINE,
-    CONF_FULL_MODE_OPTION,
-    CONF_FULL_PER_DAY,
     CONF_JOB_DONE_DELAY,
     CONF_JOB_ENTITY,
     CONF_MIN_BATTERY,
-    CONF_MIN_GAP_HOURS,
     CONF_NORMAL_FAN_SPEED,
     CONF_OCCUPANCY_SENSORS,
+    CONF_PASSES,
     CONF_PROXY_SENSORS,
     CONF_QUIET_END,
     CONF_QUIET_FAN_SPEED,
     CONF_QUIET_START,
-    CONF_ROOM_FAN_SPEED,
-    CONF_ROOM_FULL_MODE,
     CONF_ROOM_ORDER,
-    CONF_ROOM_VACUUM_MODE,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
-    CONF_VACUUM_DEADLINE,
-    CONF_VACUUM_MODE_OPTION,
-    CONF_VACUUM_PER_DAY,
     CONF_WAKE_DAYS,
     CONF_WAKE_MINUTES,
     CONF_WAKE_SENSORS,
@@ -90,20 +81,27 @@ from .const import (
     WEEKDAYS,
 )
 from .history import JobHistory, JobRecord
-from .planner import (
-    CleanKind,
+from .legacy import legacy_done, legacy_kind, legacy_program
+from .program import (
     Decision,
     GlobalConfig,
+    PassDone,
+    PassStatus,
     Plan,
     RobotState,
     RoomConfig,
     RoomOutlook,
     RoomState,
+    candidate,
+    manual_target,
     next_room,
     outlook,
+    pass_from_data,
+    pass_states,
     plan,
     should_interrupt,
 )
+from .schema import work_modes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -132,13 +130,16 @@ class Job:
     docked_since: datetime | None = None
     quiet_applied: bool = False
     manual: bool = False  # started from a button or the panel
+    day: str = ""  # local date of the first start: a pass counts on that day
 
     def serialize(self) -> dict[str, Any]:
         """For the store: a reload must not forget a running job."""
         d = self.decision
         return {
             "room_id": d.room_id,
-            "kind": d.kind.value,
+            "pass_id": d.pass_id,
+            "work_mode": d.work_mode,
+            "fan_speed": d.fan_speed,
             "forced": d.forced,
             "quiet": d.quiet,
             "phase": self.phase.value,
@@ -148,6 +149,7 @@ class Job:
             "docked_since": _iso(self.docked_since),
             "quiet_applied": self.quiet_applied,
             "manual": self.manual,
+            "day": self.day,
         }
 
     @classmethod
@@ -161,7 +163,9 @@ class Job:
             return cls(
                 decision=Decision(
                     data["room_id"],
-                    CleanKind(data["kind"]),
+                    data.get("pass_id"),
+                    data.get("work_mode"),
+                    data.get("fan_speed"),
                     forced=bool(data["forced"]),
                     quiet=bool(data["quiet"]),
                 ),
@@ -172,6 +176,7 @@ class Job:
                 docked_since=_dt(data.get("docked_since")),
                 quiet_applied=bool(data.get("quiet_applied")),
                 manual=bool(data.get("manual")),
+                day=data.get("day") or dt_util.as_local(created).date().isoformat(),
             )
         except (KeyError, TypeError, ValueError):
             return None
@@ -186,9 +191,6 @@ class Room:
     config: RoomConfig
     state: RoomState
     clean_action: list[dict[str, Any]] | None = None
-    # Robot settings of the room; None means the global setting.
-    fan_speed: str | None = None
-    mode_option: dict[CleanKind, str | None] = field(default_factory=dict)
     script: Script | None = None
     action_error: bool = False
     last_result: str | None = None  # done / interrupted / failed / stopped
@@ -209,6 +211,27 @@ def _iso(value: datetime | None) -> str | None:
 
 def _dt(value: str | None) -> datetime | None:
     return dt_util.parse_datetime(value) if value else None
+
+
+def _hm(value: time | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _done_from_store(raw: list[Any]) -> list[PassDone]:
+    done: list[PassDone] = []
+    for item in raw:
+        try:
+            done.append(
+                PassDone(
+                    str(item["pass_id"]),
+                    _dt(item.get("at")),
+                    item.get("work_mode"),
+                    bool(item.get("manual")),
+                )
+            )
+        except (KeyError, TypeError):
+            continue
+    return done
 
 
 @dataclass(slots=True)
@@ -237,10 +260,6 @@ class TidyRoomsEngine:
         self.wake_minutes = int(opts.get(CONF_WAKE_MINUTES, 0))
         self.wake_days: list[str] = list(opts.get(CONF_WAKE_DAYS) or [])
         self.work_mode_entity: str | None = opts.get(CONF_WORK_MODE_ENTITY)
-        self.mode_option = {
-            CleanKind.FULL: opts.get(CONF_FULL_MODE_OPTION),
-            CleanKind.VACUUM: opts.get(CONF_VACUUM_MODE_OPTION),
-        }
         self.normal_fan: str | None = opts.get(CONF_NORMAL_FAN_SPEED)
         self.quiet_fan: str | None = opts.get(CONF_QUIET_FAN_SPEED)
         self.battery_entity: str | None = opts.get(CONF_BATTERY_ENTITY)
@@ -259,6 +278,9 @@ class TidyRoomsEngine:
             if sub.subentry_type != SUBENTRY_ROOM:
                 continue
             d = sub.data
+            raw_passes = d.get(CONF_PASSES)
+            if raw_passes is None:  # saved by 0.3.0, not migrated yet
+                raw_passes = legacy_program(d, opts)
             self.rooms[sub.subentry_id] = Room(
                 subentry_id=sub.subentry_id,
                 area_id=d[CONF_AREA],
@@ -268,19 +290,10 @@ class TidyRoomsEngine:
                     occupancy_sensors=tuple(d.get(CONF_OCCUPANCY_SENSORS) or ()),
                     proxy_sensors=tuple(d.get(CONF_PROXY_SENSORS) or ()),
                     empty_minutes=int(d.get(CONF_EMPTY_MINUTES, 0)),
-                    full_per_day=int(d.get(CONF_FULL_PER_DAY, 0)),
-                    vacuum_per_day=int(d.get(CONF_VACUUM_PER_DAY, 0)),
-                    min_gap=timedelta(hours=float(d.get(CONF_MIN_GAP_HOURS, 0))),
-                    full_deadline=_time(d.get(CONF_FULL_DEADLINE)),
-                    vacuum_deadline=_time(d.get(CONF_VACUUM_DEADLINE)),
+                    passes=tuple(pass_from_data(p) for p in raw_passes),
                 ),
                 state=RoomState(),
                 clean_action=d.get(CONF_CLEAN_ACTION) or None,
-                fan_speed=d.get(CONF_ROOM_FAN_SPEED) or None,
-                mode_option={
-                    CleanKind.FULL: d.get(CONF_ROOM_FULL_MODE) or None,
-                    CleanKind.VACUUM: d.get(CONF_ROOM_VACUUM_MODE) or None,
-                },
             )
         # Priority order (last tie-breaker of the plan): set from the panel.
         self.rooms = self._ordered(self.rooms, opts.get(CONF_ROOM_ORDER) or [])
@@ -409,18 +422,49 @@ class TidyRoomsEngine:
             saved = stored.get(room_id, {})
             st = room.state
             st.enabled = saved.get("enabled", True)
-            st.full_today = saved.get("full_today", 0)
-            st.vacuum_today = saved.get("vacuum_today", 0)
-            st.last_full = _dt(saved.get("last_full"))
-            st.last_vacuum = _dt(saved.get("last_vacuum"))
+            if "done_today" in saved:
+                st.done_today = _done_from_store(saved["done_today"])
+                st.last_clean = _dt(saved.get("last_clean"))
+            else:  # saved by 0.3.0: counts per kind
+                st.last_clean = _dt(saved.get("last_vacuum"))
+                st.done_today = legacy_done(
+                    [p.pass_id for p in room.config.passes],
+                    int(saved.get("full_today", 0)),
+                    int(saved.get("vacuum_today", 0)),
+                    st.last_clean,
+                )
             room.last_result = saved.get("last_result")
-        job = Job.restore(raw) if (raw := data.get("job")) else None
+        raw = data.get("job")
+        job = self._restore_job(raw) if raw else None
         if (
             job is not None
             and job.decision.room_id in self.rooms
             and dt_util.now() - job.created < MAX_JOB_DURATION
         ):
             self.job = job
+
+    def _restore_job(self, raw: dict[str, Any]) -> Job | None:
+        """A saved job; one saved by 0.3.0 goes on the matching converted pass."""
+        if "kind" in raw and "pass_id" not in raw:
+            room = self.rooms.get(raw.get("room_id", ""))
+            if room is None:
+                return None
+            done = {d.pass_id for d in room.state.done_today}
+            match = next(
+                (
+                    p
+                    for p in room.config.passes
+                    if legacy_kind(p.pass_id) == raw["kind"] and p.pass_id not in done
+                ),
+                None,
+            )
+            raw = {
+                **raw,
+                "pass_id": match.pass_id if match else None,
+                "work_mode": match.work_mode if match else None,
+                "fan_speed": match.fan_speed if match else None,
+            }
+        return Job.restore(raw)
 
     def _serialize(self) -> dict[str, Any]:
         return {
@@ -431,10 +475,16 @@ class TidyRoomsEngine:
             "rooms": {
                 room_id: {
                     "enabled": r.state.enabled,
-                    "full_today": r.state.full_today,
-                    "vacuum_today": r.state.vacuum_today,
-                    "last_full": _iso(r.state.last_full),
-                    "last_vacuum": _iso(r.state.last_vacuum),
+                    "done_today": [
+                        {
+                            "pass_id": d.pass_id,
+                            "at": _iso(d.at),
+                            "work_mode": d.work_mode,
+                            "manual": d.manual,
+                        }
+                        for d in r.state.done_today
+                    ],
+                    "last_clean": _iso(r.state.last_clean),
                     "last_result": r.last_result,
                 }
                 for room_id, r in self.rooms.items()
@@ -451,8 +501,7 @@ class TidyRoomsEngine:
         if self._day != today:
             self._day = today
             for room in self.rooms.values():
-                room.state.full_today = 0
-                room.state.vacuum_today = 0
+                room.state.done_today = []
             self._save()
         self.awake_today = self._awake_day == today
 
@@ -580,7 +629,7 @@ class TidyRoomsEngine:
                 job.phase = JobPhase.FINISHING
                 job.docked_since = now
         elif state == VacuumActivity.ERROR:
-            self._end_job("failed")
+            self._fail_job(now)
 
     def _on_job_entity(self, state: str, now: datetime) -> None:
         job = self.job
@@ -612,7 +661,7 @@ class TidyRoomsEngine:
                 self.rooms[job.decision.room_id].config.name,
                 MAX_JOB_DURATION,
             )
-            self._end_job("failed")
+            self._fail_job(now)
             return
         if job.phase is JobPhase.STARTING and now - job.started >= self.start_timeout:
             if job.attempts >= MAX_START_ATTEMPTS:
@@ -621,8 +670,7 @@ class TidyRoomsEngine:
                     self.rooms[job.decision.room_id].config.name,
                     job.attempts,
                 )
-                self._failed_until = now + timedelta(minutes=FAILED_COOLDOWN_MINUTES)
-                self._end_job("failed")
+                self._fail_job(now)
                 return
             job.attempts += 1
             job.started = now
@@ -634,17 +682,26 @@ class TidyRoomsEngine:
         ):
             self._complete_job(now)
 
+    def _fail_job(self, now: datetime) -> None:
+        """The job failed: pause for a while, so a broken robot is not hammered."""
+        self._failed_until = now + timedelta(minutes=FAILED_COOLDOWN_MINUTES)
+        self._end_job("failed")
+
     def _complete_job(self, now: datetime) -> None:
         job = self.job
         if job is None:
             return
         room = self.rooms[job.decision.room_id]
         st = room.state
-        if job.decision.kind is CleanKind.FULL:
-            st.full_today += 1
-            st.last_full = now
-        st.vacuum_today += 1
-        st.last_vacuum = now
+        p = room.config.get_pass(job.decision.pass_id)
+        if p is not None:
+            # A manual cleaning that matches no pass does not count, and does
+            # not restart the gap either.
+            st.last_clean = now
+            if job.day == now.date().isoformat():
+                st.done_today.append(
+                    PassDone(p.pass_id, now, job.decision.work_mode, job.manual)
+                )
         self._end_job("done")
 
     def _end_job(self, result: str) -> None:
@@ -657,7 +714,8 @@ class TidyRoomsEngine:
             JobRecord(
                 room_id=room.subentry_id,
                 room=room.config.name,
-                kind=job.decision.kind.value,
+                work_mode=job.decision.work_mode,
+                pass_id=job.decision.pass_id,
                 forced=job.decision.forced,
                 quiet=job.decision.quiet or job.quiet_applied,
                 manual=job.manual,
@@ -721,32 +779,62 @@ class TidyRoomsEngine:
             started=now,
             created=now,
             manual=manual,
+            day=now.date().isoformat(),
         )
         self._save()
         self.job.quiet_applied = decision.quiet
         _LOGGER.info(
             "Cleaning %s (%s%s)",
             self.rooms[decision.room_id].config.name,
-            decision.kind,
+            decision.work_mode or "robot's work mode",
             ", forced" if decision.forced else "",
         )
         self.hass.async_create_task(self._async_send_job(decision))
 
-    async def async_clean_now(self, room_id: str, kind: CleanKind | None = None) -> None:
-        """Clean a room right away, ignoring occupancy and targets."""
+    def default_work_mode(self, room_id: str) -> str | None:
+        """Work mode of "clean now" without a choice: the next pass's, or the last one's."""
+        room = self.rooms[room_id]
+        now = dt_util.now()
+        passes = room.config.passes
+        i = candidate(room.config, pass_states(room.config, room.state, now), now)
+        if i is not None:
+            return passes[i].work_mode
+        return passes[-1].work_mode if passes else None
+
+    async def async_clean_now(
+        self, room_id: str, work_mode: str | None = None, *, use_default: bool = True
+    ) -> None:
+        """Clean a room right away, ignoring occupancy and targets.
+
+        The cleaning counts as the first pass of today (pending or skipped)
+        with the same work mode; otherwise it is logged but does not count.
+        Without `work_mode` (and `use_default`), the next pass's work mode.
+        """
         if self.job is not None:
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="robot_busy")
         room = self.rooms[room_id]
-        if kind is None:
-            kind = (
-                CleanKind.FULL
-                if room.state.full_today < room.config.full_per_day
-                else CleanKind.VACUUM
-            )
-        # Forced: someone asked for it, so presence must not interrupt it.
-        self._start_job(
-            Decision(room_id, kind, forced=True, quiet=False), dt_util.now(), manual=True
+        now = dt_util.now()
+        if not self.work_mode_entity:
+            work_mode = None  # nothing to choose: counts as the next pass
+        elif work_mode is None and use_default:
+            work_mode = self.default_work_mode(room_id)
+        target = manual_target(
+            room.config,
+            room.state,
+            now,
+            work_mode,
+            any_mode=not self.work_mode_entity,
         )
+        # Forced: someone asked for it, so presence must not interrupt it.
+        decision = Decision(
+            room_id,
+            target.pass_id if target else None,
+            work_mode,
+            target.fan_speed if target else None,
+            forced=True,
+            quiet=False,
+        )
+        self._start_job(decision, now, manual=True)
         self._notify()
 
     async def async_stop_job(self) -> None:
@@ -792,15 +880,16 @@ class TidyRoomsEngine:
 
     async def _async_send_job(self, decision: Decision) -> None:
         room = self.rooms[decision.room_id]
-        option = room.mode_option.get(decision.kind) or self.mode_option[decision.kind]
-        if self.work_mode_entity and option:
+        if self.work_mode_entity and decision.work_mode:
             await self._async_call(
                 "select",
                 "select_option",
-                {ATTR_ENTITY_ID: self.work_mode_entity, "option": option},
+                {ATTR_ENTITY_ID: self.work_mode_entity, "option": decision.work_mode},
             )
-        # Quiet (forced while someone is there) wins over the room's own speed.
-        speed = self.quiet_fan if decision.quiet else (room.fan_speed or self.normal_fan)
+        # Quiet (forced while someone is there) wins over the pass's own speed.
+        speed = (
+            self.quiet_fan if decision.quiet else (decision.fan_speed or self.normal_fan)
+        )
         if speed:
             await self._async_fan(speed)
         if room.script is not None:
@@ -809,7 +898,8 @@ class TidyRoomsEngine:
                     run_variables={
                         "room": room.config.name,
                         "area_id": room.area_id,
-                        "kind": str(decision.kind),
+                        "work_mode": decision.work_mode,
+                        "pass_id": decision.pass_id,
                         "quiet": decision.quiet,
                         "vacuum_entity": self.vacuum_entity,
                     },
@@ -865,10 +955,9 @@ class TidyRoomsEngine:
             "quiet_end": quiet.quiet_end.isoformat() if quiet.quiet_end else None,
             "min_battery": quiet.min_battery,
             "work_mode_entity": self.work_mode_entity,
+            "work_modes": work_modes(self.hass, self.work_mode_entity),
             "normal_fan_speed": self.normal_fan,
             "quiet_fan_speed": self.quiet_fan,
-            "full_mode_option": self.mode_option[CleanKind.FULL],
-            "vacuum_mode_option": self.mode_option[CleanKind.VACUUM],
             "paused_until": _iso(self._failed_until)
             if self._failed_until and now < self._failed_until
             else None,
@@ -884,7 +973,8 @@ class TidyRoomsEngine:
             "job": {
                 "room_id": job.decision.room_id,
                 "room": self.rooms[job.decision.room_id].config.name,
-                "kind": job.decision.kind.value,
+                "pass_id": job.decision.pass_id,
+                "work_mode": job.decision.work_mode,
                 "forced": job.decision.forced,
                 "quiet": job.decision.quiet or job.quiet_applied,
                 "manual": job.manual,
@@ -896,14 +986,49 @@ class TidyRoomsEngine:
             else None,
             "next_room": next_room(outlooks, list(self.rooms)),
             "rooms": [
-                self._room_snapshot(r, outlooks[room_id])
+                self._room_snapshot(r, outlooks[room_id], now)
                 for room_id, r in self.rooms.items()
             ],
         }
 
-    def _room_snapshot(self, room: Room, ol: RoomOutlook) -> dict[str, Any]:
+    def pass_states(self, room: Room, now: datetime) -> list[PassStatus]:
+        """Today's status of each pass of a room (the running job included)."""
+        job = self.job
+        active = job if job is not None and job.decision.room_id == room.subentry_id else None
+        return pass_states(
+            room.config,
+            room.state,
+            now,
+            active_pass_id=active.decision.pass_id if active else None,
+            active_manual=active.manual if active else False,
+        )
+
+    def _room_snapshot(self, room: Room, ol: RoomOutlook, now: datetime) -> dict[str, Any]:
         cfg, st = room.config, room.state
         status = self.last_plan.statuses.get(room.subentry_id)
+        done = {d.pass_id: d for d in st.done_today}
+        passes = []
+        position = 0
+        for p, pass_status in zip(cfg.passes, self.pass_states(room, now), strict=True):
+            today = pass_status is not PassStatus.NOT_TODAY
+            position += today
+            d = done.get(p.pass_id)
+            passes.append(
+                {
+                    "id": p.pass_id,
+                    "position": position if today else None,
+                    "work_mode": p.work_mode,
+                    "fan_speed": p.fan_speed,
+                    "start": _hm(p.start),
+                    "end": _hm(p.end),
+                    "forced": p.is_forced,
+                    "gap_hours": p.gap.total_seconds() / 3600 if p.gap else None,
+                    "days": [WEEKDAYS[i] for i in sorted(p.days)] if p.days else None,
+                    "status": pass_status.value,
+                    "done_at": _iso(d.at) if d else None,
+                    "manual": d.manual if d else False,
+                }
+            )
         return {
             "id": room.subentry_id,
             "name": cfg.name,
@@ -917,29 +1042,21 @@ class TidyRoomsEngine:
             "empty_since": _iso(st.empty_since),
             "proxy_active": st.proxy_active,
             "empty_minutes": cfg.empty_minutes,
-            "full_today": st.full_today,
-            "full_per_day": cfg.full_per_day,
-            "vacuum_today": st.vacuum_today,
-            "vacuum_per_day": cfg.vacuum_per_day,
-            "min_gap_hours": cfg.min_gap.total_seconds() / 3600,
-            "full_deadline": cfg.full_deadline.isoformat() if cfg.full_deadline else None,
-            "vacuum_deadline": cfg.vacuum_deadline.isoformat()
-            if cfg.vacuum_deadline
-            else None,
-            "last_full": _iso(st.last_full),
-            "last_vacuum": _iso(st.last_vacuum),
+            "passes": passes,
+            "last_clean": _iso(st.last_clean),
             "last_result": room.last_result,
             "custom_action": room.clean_action is not None,
-            "fan_speed": room.fan_speed,
-            "full_mode": room.mode_option.get(CleanKind.FULL),
-            "vacuum_mode": room.mode_option.get(CleanKind.VACUUM),
             "outlook": {
-                "kind": ol.kind.value if ol.kind else None,
+                "pass_id": ol.pass_id,
+                "position": ol.position,
+                "total": ol.total,
+                "done": ol.done,
+                "skipped": ol.skipped,
+                "work_mode": ol.work_mode,
                 "earliest": _iso(ol.earliest),
                 "reason": ol.reason.value if ol.reason else None,
                 "free_at": _iso(ol.free_at),
                 "deadline": _iso(ol.deadline),
-                "full_left": ol.full_left,
-                "vacuum_left": ol.vacuum_left,
+                "forced": ol.forced,
             },
         }

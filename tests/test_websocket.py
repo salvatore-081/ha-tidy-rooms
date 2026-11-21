@@ -60,7 +60,12 @@ async def test_entries_and_snapshot(
     (room,) = event["rooms"]
     assert room["name"] == "Kitchen"
     assert room["status"] == "waiting_occupied"
-    assert room["outlook"]["kind"] == "full"
+    assert room["outlook"]["pass_id"] == "full-1"
+    assert room["outlook"]["work_mode"] == "mop_after_vacuum"
+    assert (room["outlook"]["position"], room["outlook"]["total"]) == (1, 2)
+    assert [p["status"] for p in room["passes"]] == ["pending", "pending"]
+    assert room["passes"][1]["gap_hours"] == 6
+    assert event["work_modes"] == ["vacuum", "mop_after_vacuum"]
     assert room["outlook"]["reason"] == "empty"
     assert room["outlook"]["earliest"].startswith("2026-01-12T10:10")
     assert event["next_room"] == room["id"]
@@ -267,12 +272,15 @@ async def test_commands_and_history(
         type="tidy_rooms/clean_now",
         entry_id=entry.entry_id,
         room_id=room_id,
-        kind="vacuum",
+        work_mode="vacuum",
     )
     assert res["success"]
     await hass.async_block_till_done()
     assert len(calls["clean_area"]) == 1
+    assert calls["mode"][-1].data["option"] == "vacuum"
     assert engine.job is not None and engine.job.manual
+    # Counts as the vacuum pass (the full pass is still due).
+    assert engine.job.decision.pass_id == "vacuum-1"
 
     res = await _call(
         client, type="tidy_rooms/clean_now", entry_id=entry.entry_id, room_id=room_id
@@ -288,7 +296,9 @@ async def test_commands_and_history(
     res = await _call(client, type="tidy_rooms/history", entry_id=entry.entry_id)
     (job,) = res["result"]["jobs"]
     assert job["room"] == "Kitchen"
-    assert job["kind"] == "vacuum"
+    assert job["work_mode"] == "vacuum"
+    assert job["pass_id"] == "vacuum-1"
+    assert job["kind"] is None
     assert job["manual"] is True
     assert job["result"] == "stopped"
 
@@ -318,7 +328,8 @@ async def test_history_is_kept_30_days(
     hass.states.async_set(VACUUM, "docked")
     await advance(hass, freezer, 6)
     (record,) = engine.history.records
-    assert record.result == "done" and record.kind == "full" and not record.manual
+    assert record.result == "done" and not record.manual
+    assert (record.work_mode, record.pass_id) == ("mop_after_vacuum", "full-1")
 
     # Survives a reload.
     await hass.config_entries.async_reload(entry.entry_id)
@@ -434,7 +445,8 @@ async def test_room_form_offers_robot_settings(
     )
     assert res["result"] == {"room_id": room_id}
     await hass.async_block_till_done()
-    assert entry.runtime_data.rooms[room_id].fan_speed == "quiet"
+    passes = entry.runtime_data.rooms[room_id].config.passes
+    assert passes and all(p.fan_speed == "quiet" for p in passes)
 
 
 async def test_room_form_without_work_mode_entity(

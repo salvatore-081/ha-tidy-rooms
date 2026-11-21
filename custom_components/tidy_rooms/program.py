@@ -403,16 +403,21 @@ def should_interrupt(cfg: RoomConfig, st: RoomState, decision: Decision) -> bool
 
 
 def manual_target(
-    cfg: RoomConfig, st: RoomState, now: datetime, work_mode: str | None
+    cfg: RoomConfig,
+    st: RoomState,
+    now: datetime,
+    work_mode: str | None,
+    *,
+    any_mode: bool = False,
 ) -> PassConfig | None:
     """The pass a manual cleaning with `work_mode` counts as, if any.
 
-    The first pass of today, pending or skipped, with the same work mode.
+    The first pass of today, pending or skipped, with the same work mode
+    (any work mode with `any_mode`: the robot has no work mode to choose).
     """
     for p, status in zip(cfg.passes, pass_states(cfg, st, now), strict=True):
-        if (
-            status in (PassStatus.PENDING, PassStatus.SKIPPED)
-            and p.work_mode == work_mode
+        if status in (PassStatus.PENDING, PassStatus.SKIPPED) and (
+            any_mode or p.work_mode == work_mode
         ):
             return p
     return None

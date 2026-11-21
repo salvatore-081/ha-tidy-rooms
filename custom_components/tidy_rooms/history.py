@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -23,7 +23,6 @@ class JobRecord:
 
     room_id: str
     room: str  # name at the time, the room may be deleted later
-    kind: str  # full / vacuum
     forced: bool  # deadline passed (or started by hand)
     quiet: bool  # quiet fan speed used
     manual: bool  # started from a button or the panel
@@ -31,6 +30,12 @@ class JobRecord:
     started: str  # ISO
     ended: str  # ISO
     result: str  # done / interrupted / failed / stopped
+    work_mode: str | None = None  # None: the robot's mode was left as it was
+    pass_id: str | None = None  # None: a manual cleaning that did not count
+    kind: str | None = None  # full / vacuum: jobs logged by 0.3.0
+
+
+_FIELDS = {f.name for f in fields(JobRecord)}
 
 
 class JobHistory:
@@ -49,9 +54,10 @@ class JobHistory:
         self.records = []
         for raw in data.get("jobs", []):
             try:
-                self.records.append(JobRecord(**raw))
+                known = {k: v for k, v in raw.items() if k in _FIELDS}
+                self.records.append(JobRecord(**known))
             except TypeError:
-                continue  # written by another version: skip
+                continue  # unusable: skip
         self._prune(dt_util.now())
 
     def add(self, record: JobRecord) -> None:

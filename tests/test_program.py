@@ -13,7 +13,6 @@ from custom_components.tidy_rooms.legacy import (
     legacy_done,
     legacy_kind,
     legacy_program,
-    strip_kinds,
 )
 from custom_components.tidy_rooms.program import (
     Decision,
@@ -45,11 +44,6 @@ def at(hour: int, minute: int = 0) -> datetime:
     return DAY.replace(hour=hour, minute=minute)
 
 
-def ids():
-    counter = itertools.count(1)
-    return lambda: f"p{next(counter)}"
-
-
 DEFAULT_ROOM = {
     "full_per_day": 1,
     "vacuum_per_day": 2,
@@ -61,9 +55,9 @@ MODES = {"full_mode_option": "mop_after_vacuum", "vacuum_mode_option": "vacuum"}
 
 
 def legacy_room(room_id: str = "living", sensors=SENSOR, **room) -> RoomConfig:
-    """The program a 0.3.0 room is migrated to (passes p1, p2, …)."""
+    """The program a 0.3.0 room is migrated to (passes full-1, vacuum-1, …)."""
     data = {**DEFAULT_ROOM, **room}
-    passes = strip_kinds(legacy_program(data, MODES, ids()))
+    passes = legacy_program(data, MODES)
     return RoomConfig(
         room_id,
         room_id,
@@ -116,23 +110,26 @@ def test_pass_from_data() -> None:
 
 
 def test_legacy_program_default_room() -> None:
-    passes = legacy_program(DEFAULT_ROOM, MODES, ids())
-    assert strip_kinds(passes) == [
+    passes = legacy_program(DEFAULT_ROOM, MODES)
+    assert passes == [
         {
-            "id": "p1",
+            "id": "full-1",
             "forced": True,
             "work_mode": "mop_after_vacuum",
             "end": "19:00:00",
         },
         {
-            "id": "p2",
+            "id": "vacuum-1",
             "forced": True,
             "work_mode": "vacuum",
             "end": "21:30:00",
             "gap_hours": 6.0,
         },
     ]
-    assert legacy_kind(passes, "p1") == KIND_FULL
+    assert legacy_kind("full-1") == KIND_FULL
+    assert legacy_kind("vacuum-12") == "vacuum"
+    assert legacy_kind("3f9a01bc") is None
+    assert legacy_kind(None) is None
 
 
 @pytest.mark.parametrize(
@@ -142,14 +139,16 @@ def test_legacy_program_default_room() -> None:
         (
             {"full_per_day": 0, "vacuum_per_day": 2, "min_gap_hours": 4},
             {},
-            [{"id": "p1", "forced": True, "gap_hours": 4.0}] * 1
-            + [{"id": "p2", "forced": True, "gap_hours": 4.0}],
+            [
+                {"id": "vacuum-1", "forced": True, "gap_hours": 4.0},
+                {"id": "vacuum-2", "forced": True, "gap_hours": 4.0},
+            ],
         ),
         # As many full passes as vacuum passes: no vacuum-only pass.
         (
             {"full_per_day": 2, "vacuum_per_day": 2, "min_gap_hours": 6},
             {},
-            [{"id": "p1", "forced": True}, {"id": "p2", "forced": True}],
+            [{"id": "full-1", "forced": True}, {"id": "full-2", "forced": True}],
         ),
         # Room modes and fan speed win over the global ones; no deadlines.
         (
@@ -162,7 +161,7 @@ def test_legacy_program_default_room() -> None:
             MODES,
             [
                 {
-                    "id": "p1",
+                    "id": "full-1",
                     "forced": True,
                     "work_mode": "vacuum_and_mop",
                     "fan_speed": "max",
@@ -173,20 +172,24 @@ def test_legacy_program_default_room() -> None:
     ],
 )
 def test_legacy_program_cases(room_data, options, expected) -> None:
-    assert strip_kinds(legacy_program(room_data, options, ids())) == expected
+    assert legacy_program(room_data, options) == expected
 
 
 def test_legacy_done_converts_counts() -> None:
-    passes = legacy_program({**DEFAULT_ROOM, "vacuum_per_day": 3}, MODES, ids())
+    passes = [
+        p["id"] for p in legacy_program({**DEFAULT_ROOM, "vacuum_per_day": 3}, MODES)
+    ]
     assert legacy_done(passes, 0, 0, None) == []
-    assert legacy_done(passes, 1, 1, at(9)) == [PassDone("p1", at(9), manual=True)]
+    assert legacy_done(passes, 1, 1, at(9)) == [PassDone("full-1", at(9), manual=True)]
     assert legacy_done(passes, 1, 2, at(15)) == [
-        PassDone("p1", None, manual=True),
-        PassDone("p2", at(15), manual=True),
+        PassDone("full-1", None, manual=True),
+        PassDone("vacuum-1", at(15), manual=True),
     ]
     # A vacuum pass done without the full one (old "clean now" button): the
     # full pass stays due, as in 0.3.0.
-    assert legacy_done(passes, 0, 1, at(9)) == [PassDone("p2", at(9), manual=True)]
+    assert legacy_done(passes, 0, 1, at(9)) == [
+        PassDone("vacuum-1", at(9), manual=True)
+    ]
     # More than planned: capped.
     assert len(legacy_done(passes, 3, 9, at(9))) == 3
 
@@ -258,7 +261,7 @@ def test_empty_room_gets_first_pass() -> None:
     now = at(10)
     p = plan(now, G, [(legacy_room(), empty_for(15, now))], READY)
     assert p.decision == Decision(
-        "living", "p1", "mop_after_vacuum", None, forced=False, quiet=False
+        "living", "full-1", "mop_after_vacuum", None, forced=False, quiet=False
     )
     assert p.statuses["living"] is RoomStatus.READY
 
@@ -274,7 +277,7 @@ def test_occupied_room_is_forced_and_quiet_after_deadline() -> None:
     p = plan(at(19, 5), G, [(legacy_room(), RoomState(occupied=True))], READY)
     assert p.decision is not None
     assert (p.decision.pass_id, p.decision.forced, p.decision.quiet) == (
-        "p1",
+        "full-1",
         True,
         True,
     )
@@ -321,7 +324,7 @@ def test_pass_without_deadline_is_overtaken_at_a_forced_deadline() -> None:
 
 def test_done_when_nothing_is_pending() -> None:
     cfg = legacy_room()
-    st = RoomState(occupied=False, done_today=done("p1", "p2", at_=at(15)))
+    st = RoomState(occupied=False, done_today=done("full-1", "vacuum-1", at_=at(15)))
     assert plan(at(16), G, [(cfg, st)], READY).statuses["living"] is RoomStatus.DONE
     # Empty program, or no pass today.
     assert (
@@ -394,8 +397,8 @@ def test_priority_forced_then_deadline_then_longest_wait_then_order() -> None:
 
 def test_should_interrupt() -> None:
     cfg = legacy_room()
-    normal = Decision("living", "p1", None, None, forced=False, quiet=False)
-    forced = Decision("living", "p1", None, None, forced=True, quiet=False)
+    normal = Decision("living", "full-1", None, None, forced=False, quiet=False)
+    forced = Decision("living", "full-1", None, None, forced=True, quiet=False)
     assert should_interrupt(cfg, RoomState(occupied=True), normal)
     assert not should_interrupt(cfg, RoomState(occupied=False), normal)
     assert not should_interrupt(cfg, RoomState(occupied=True), forced)
@@ -423,7 +426,7 @@ def test_outlook_empty_room_starts_when_free() -> None:
     now = at(10)
     ol = outlook(now, G, legacy_room(), empty_for(4, now))
     assert (ol.pass_id, ol.position, ol.total, ol.done, ol.skipped) == (
-        "p1",
+        "full-1",
         1,
         2,
         0,
@@ -453,9 +456,9 @@ def test_outlook_window_gap_and_quiet_hours() -> None:
     ol = outlook(now, G, cfg, empty_for(60, now))
     assert ol.earliest == at(14) and ol.reason is WaitReason.WINDOW
 
-    st = empty_for(60, now, done_today=done("p1", at_=at(10)), last_clean=at(10))
+    st = empty_for(60, now, done_today=done("full-1", at_=at(10)), last_clean=at(10))
     ol = outlook(now, G, legacy_room(), st)
-    assert (ol.pass_id, ol.position, ol.done) == ("p2", 2, 1)
+    assert (ol.pass_id, ol.position, ol.done) == ("vacuum-1", 2, 1)
     assert ol.earliest == at(16) and ol.reason is WaitReason.GAP
 
     ol = outlook(at(6), G, legacy_room(), empty_for(60, at(6)))
@@ -477,7 +480,7 @@ def test_outlook_not_forced_pass_that_cannot_fit() -> None:
 
 
 def test_outlook_done_and_not_awake() -> None:
-    st = RoomState(done_today=done("p1", "p2", at_=at(15)))
+    st = RoomState(done_today=done("full-1", "vacuum-1", at_=at(15)))
     ol = outlook(at(20), G, legacy_room(), st)
     assert ol.pass_id is None and ol.earliest is None and (ol.done, ol.total) == (2, 2)
     ol = outlook(at(9), G, legacy_room(), empty_for(60, at(9)), awake=False)
@@ -579,17 +582,17 @@ def test_same_decisions_as_0_3_0(now, rid, data, progress, occ) -> None:
     )
     old_plan = old.plan(now, G_OLD, [(_old_room(rid, data), old_st)], OLD_READY)
 
-    passes = legacy_program(data, MODES, ids())
+    passes = legacy_program(data, MODES)
     cfg = RoomConfig(
         rid,
         rid,
         occupancy_sensors=SENSOR,
-        passes=tuple(pass_from_data(p) for p in strip_kinds(passes)),
+        passes=tuple(pass_from_data(p) for p in passes),
     )
     new_st = RoomState(
         occupied=occupied,
         empty_since=since,
-        done_today=legacy_done(passes, full, vac, last_at),
+        done_today=legacy_done([p["id"] for p in passes], full, vac, last_at),
         last_clean=last_at,
     )
     new_plan = plan(now, G, [(cfg, new_st)], READY)
@@ -600,9 +603,16 @@ def test_same_decisions_as_0_3_0(now, rid, data, progress, occ) -> None:
         return
     d = new_plan.decision
     assert d is not None
-    assert legacy_kind(passes, d.pass_id) == old_plan.decision.kind.value
+    assert legacy_kind(d.pass_id) == old_plan.decision.kind.value
     assert (d.forced, d.quiet) == (old_plan.decision.forced, old_plan.decision.quiet)
 
 
 G_OLD = old.GlobalConfig()
 OLD_READY = old.RobotState(available=True, idle=True, battery=100)
+
+
+def test_manual_target_any_mode() -> None:
+    """Without a work mode entity, a manual cleaning counts as the next pass."""
+    cfg = room(PassConfig("a", "mop_after_vacuum"), PassConfig("b", "vacuum"))
+    target = manual_target(cfg, RoomState(), at(10), None, any_mode=True)
+    assert target is not None and target.pass_id == "a"

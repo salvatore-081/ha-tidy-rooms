@@ -12,6 +12,7 @@ from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
 from .const import (
@@ -113,9 +114,16 @@ def fan_speeds(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
 
 
 def work_modes(hass: HomeAssistant, work_mode_entity: str | None) -> list[str]:
-    """Options of the robot's work mode select entity."""
+    """Options of the robot's work mode select entity (empty if unknown).
+
+    From the entity registry first: at startup the robot's integration may
+    not have set its state yet.
+    """
     if not work_mode_entity:
         return []
+    entry = er.async_get(hass).async_get(work_mode_entity)
+    if entry is not None and (options := (entry.capabilities or {}).get("options")):
+        return list(options)
     state = hass.states.get(work_mode_entity)
     return list(state.attributes.get("options") or []) if state else []
 

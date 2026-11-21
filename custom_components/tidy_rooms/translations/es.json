@@ -158,6 +158,7 @@
         "state": {
           "disabled": "Desactivada",
           "done": "Hecho por hoy",
+          "waiting_window": "Próxima pasada más tarde (franja)",
           "waiting_gap": "Próxima pasada más tarde",
           "waiting_occupied": "Esperando a que la habitación esté vacía",
           "waiting_quiet_hours": "Horas de silencio",
@@ -167,11 +168,11 @@
           "cleaning": "Limpiando"
         }
       },
-      "last_full": {
-        "name": "Último aspirado y fregado"
+      "last_clean": {
+        "name": "Última limpieza"
       },
-      "last_vacuum": {
-        "name": "Último aspirado"
+      "passes_today": {
+        "name": "Pasadas hoy"
       }
     },
     "switch": {
@@ -183,11 +184,11 @@
       }
     },
     "button": {
-      "clean_now_full": {
-        "name": "Aspirar y fregar ahora"
+      "clean_now": {
+        "name": "Limpiar ahora"
       },
-      "clean_now_vacuum": {
-        "name": "Aspirar ahora"
+      "clean_now_mode": {
+        "name": "Limpiar ahora: {mode}"
       }
     }
   },

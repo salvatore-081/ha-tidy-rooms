@@ -56,9 +56,16 @@ async def make(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
     options: dict | None = None,
+    *,
+    entry_id: str | None = None,
+    room_id: str | None = None,
+    room_data: dict | None = None,
     **room_extra,
 ):
-    """Set up the integration with one room."""
+    """Set up the integration with one room.
+
+    `room_data` replaces the room's counts and deadlines (0.3.0 format).
+    """
     await hass.config.async_set_time_zone("Europe/Rome")
     freezer.move_to("2026-01-12 10:00:00+01:00")  # Monday 10:00
     area = ar.async_get(hass).async_create("Kitchen")
@@ -66,9 +73,17 @@ async def make(
     hass.states.async_set(MODE, "vacuum", {"options": ["vacuum", "mop_after_vacuum"]})
     hass.states.async_set(SENSOR, "off")
 
+    room = room_data or {
+        CONF_FULL_PER_DAY: 1,
+        CONF_VACUUM_PER_DAY: 2,
+        CONF_MIN_GAP_HOURS: 6,
+        CONF_FULL_DEADLINE: "19:00:00",
+        CONF_VACUUM_DEADLINE: "21:30:00",
+    }
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Robot",
+        **({"entry_id": entry_id} if entry_id else {}),
         data={CONF_VACUUM: VACUUM},
         options={
             CONF_QUIET_START: "22:30:00",
@@ -92,13 +107,10 @@ async def make(
                     CONF_AREA: area.id,
                     CONF_OCCUPANCY_SENSORS: [SENSOR],
                     CONF_EMPTY_MINUTES: 10,
-                    CONF_FULL_PER_DAY: 1,
-                    CONF_VACUUM_PER_DAY: 2,
-                    CONF_MIN_GAP_HOURS: 6,
-                    CONF_FULL_DEADLINE: "19:00:00",
-                    CONF_VACUUM_DEADLINE: "21:30:00",
+                    **room,
                     **room_extra,
                 },
+                **({"subentry_id": room_id} if room_id else {}),
             )
         ],
     )

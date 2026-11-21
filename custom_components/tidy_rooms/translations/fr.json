@@ -158,6 +158,7 @@
         "state": {
           "disabled": "Désactivée",
           "done": "Terminé pour aujourd'hui",
+          "waiting_window": "Prochain passage plus tard (créneau)",
           "waiting_gap": "Prochain passage plus tard",
           "waiting_occupied": "En attente que la pièce soit vide",
           "waiting_quiet_hours": "Heures calmes",
@@ -167,11 +168,11 @@
           "cleaning": "Nettoyage"
         }
       },
-      "last_full": {
-        "name": "Dernier passage aspiration et lavage"
+      "last_clean": {
+        "name": "Dernier nettoyage"
       },
-      "last_vacuum": {
-        "name": "Dernière aspiration"
+      "passes_today": {
+        "name": "Passages aujourd'hui"
       }
     },
     "switch": {
@@ -183,11 +184,11 @@
       }
     },
     "button": {
-      "clean_now_full": {
-        "name": "Aspirer et laver maintenant"
+      "clean_now": {
+        "name": "Nettoyer maintenant"
       },
-      "clean_now_vacuum": {
-        "name": "Aspirer maintenant"
+      "clean_now_mode": {
+        "name": "Nettoyer maintenant : {mode}"
       }
     }
   },
