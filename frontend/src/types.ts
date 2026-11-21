@@ -2,11 +2,13 @@
 
 import type { Connection, HassEntity } from "home-assistant-js-websocket";
 
-export type CleanKind = "full" | "vacuum";
+/** Kind of pass of Tidy Rooms 0.3.0: only in jobs logged by that version. */
+export type LegacyKind = "full" | "vacuum";
 
 export type RoomStatus =
   | "disabled"
   | "done"
+  | "waiting_window"
   | "waiting_gap"
   | "waiting_occupied"
   | "waiting_quiet_hours"
@@ -15,20 +17,49 @@ export type RoomStatus =
   | "ready"
   | "cleaning";
 
-export type WaitReason = "gap" | "quiet_hours" | "awake" | "empty" | "occupied" | "not_today";
+export type WaitReason =
+  "window" | "gap" | "quiet_hours" | "awake" | "empty" | "occupied" | "not_today";
+
+export type PassStatus = "not_today" | "done" | "active" | "skipped" | "pending";
+
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 export type JobPhase = "starting" | "running" | "finishing";
 
 export type JobResult = "done" | "interrupted" | "failed" | "stopped";
 
+/** When the next pass of a room can start (an estimate). */
 export interface Outlook {
-  kind: CleanKind | null;
+  /** The next pass still due today; null when nothing is left. */
+  pass_id: string | null;
+  /** 1-based among today's passes (0 without a next pass). */
+  position: number;
+  total: number;
+  done: number;
+  skipped: number;
+  work_mode: string | null;
   earliest: string | null;
   reason: WaitReason | null;
   free_at: string | null;
   deadline: string | null;
-  full_left: number;
-  vacuum_left: number;
+  forced: boolean;
+}
+
+/** A pass of a room's program, with where it stands today. */
+export interface PassSnapshot {
+  id: string;
+  /** 1-based among today's passes; null when not planned today. */
+  position: number | null;
+  work_mode: string | null;
+  fan_speed: string | null;
+  start: string | null;
+  end: string | null;
+  forced: boolean;
+  gap_hours: number | null;
+  days: Weekday[] | null;
+  status: PassStatus;
+  done_at: string | null;
+  manual: boolean;
 }
 
 export interface RoomSnapshot {
@@ -44,28 +75,20 @@ export interface RoomSnapshot {
   empty_since: string | null;
   proxy_active: boolean;
   empty_minutes: number;
-  full_today: number;
-  full_per_day: number;
-  vacuum_today: number;
-  vacuum_per_day: number;
-  min_gap_hours: number;
-  full_deadline: string | null;
-  vacuum_deadline: string | null;
-  last_full: string | null;
-  last_vacuum: string | null;
+  passes: PassSnapshot[];
+  last_clean: string | null;
   last_result: JobResult | null;
   custom_action: boolean;
-  /** The room's own robot settings; null means the global setting. */
-  fan_speed: string | null;
-  full_mode: string | null;
-  vacuum_mode: string | null;
   outlook: Outlook;
 }
 
 export interface JobSnapshot {
   room_id: string;
   room: string;
-  kind: CleanKind;
+  /** null: a manual cleaning that does not count as a pass. */
+  pass_id: string | null;
+  /** null: the robot's work mode was left as it was. */
+  work_mode: string | null;
   forced: boolean;
   quiet: boolean;
   manual: boolean;
@@ -96,10 +119,12 @@ export interface LoadedSnapshot {
   quiet_end: string | null;
   min_battery: number;
   work_mode_entity: string | null;
+  /** Options of the work mode entity (empty if none or unknown). */
+  work_modes: string[];
+  restore_settings: boolean;
+  restore_pending: boolean;
   normal_fan_speed: string | null;
   quiet_fan_speed: string | null;
-  full_mode_option: string | null;
-  vacuum_mode_option: string | null;
   paused_until: string | null;
   robot: RobotSnapshot;
   job: JobSnapshot | null;
@@ -119,7 +144,11 @@ export interface EntrySummary {
 export interface JobRecord {
   room_id: string;
   room: string;
-  kind: CleanKind;
+  work_mode?: string | null;
+  /** null: a manual cleaning that did not count as a pass. */
+  pass_id?: string | null;
+  /** Jobs logged by 0.3.0. */
+  kind?: LegacyKind | null;
   forced: boolean;
   quiet: boolean;
   manual: boolean;
@@ -137,6 +166,19 @@ export interface FormField {
   selector?: Record<string, unknown>;
   [key: string]: unknown;
 }
+
+/** The room form: ha-form schemas and the room's program. */
+export interface RoomForm {
+  schema: FormField[];
+  values: Record<string, unknown>;
+  pass_schema: FormField[];
+  pass_defaults: Record<string, unknown>;
+  passes: PassData[];
+  max_passes: number;
+}
+
+/** A pass as saved (and edited): no id for a new one. */
+export type PassData = Record<string, unknown> & { id?: string };
 
 export interface SaveResult {
   errors?: Record<string, string>;

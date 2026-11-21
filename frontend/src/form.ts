@@ -37,7 +37,7 @@ export const splitErrors = (errors: Record<string, string> | undefined) => {
 };
 
 const FAN_FIELDS = ["fan_speed", "normal_fan_speed", "quiet_fan_speed"];
-const MODE_FIELDS = ["full_mode", "vacuum_mode", "full_mode_option", "vacuum_mode_option"];
+const MODE_FIELDS = ["work_mode"];
 
 /** The robot's own name of a fan speed ("max_plus" → "Max+"), as Home Assistant shows it. */
 export const fanSpeedLabel = (hass: HomeAssistant, vacuum: string, value: string): string => {

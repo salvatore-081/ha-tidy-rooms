@@ -18,7 +18,6 @@ const SECTIONS: { key: string; icon: string }[] = [
 ];
 
 const WORK_MODE = "work_mode_entity";
-const MODE_FIELDS = ["full_mode_option", "vacuum_mode_option"];
 
 const clean = (data: Record<string, unknown>) =>
   Object.fromEntries(
@@ -127,7 +126,7 @@ export class TrViewSettings extends LitElement {
       ${SECTIONS.map(({ key, icon }) => {
         let schema = this._sections![key] ?? [];
         if (key === "robot") {
-          // The work mode selector lives here, before the modes it offers.
+          // The work mode selector lives here, with the other robot settings.
           const workMode = this._sections!.signals?.find((f) => f.name === WORK_MODE);
           schema = workMode ? [workMode, ...schema] : schema;
         }
@@ -174,22 +173,13 @@ export class TrViewSettings extends LitElement {
   }
 
   private _changed(ev: CustomEvent<{ value: Record<string, unknown> }>) {
-    const before = this._data[WORK_MODE];
     this._data = clean({ ...this._data, ...ev.detail.value });
     for (const [k, v] of Object.entries(ev.detail.value)) if (v === undefined) delete this._data[k];
-    const after = this._data[WORK_MODE];
-    if (before !== after) {
-      // Different selector: its options differ, so the chosen modes no longer apply.
-      for (const f of MODE_FIELDS) delete this._data[f];
-      this._load((after as string | undefined) ?? null);
-    }
   }
 
   private _reset() {
-    const workModeChanged = this._data[WORK_MODE] !== this._saved[WORK_MODE];
     this._data = { ...this._saved };
     this._errors = {};
-    if (workModeChanged) this._load((this._saved[WORK_MODE] as string | undefined) ?? null);
   }
 
   private async _save() {

@@ -233,7 +233,7 @@ export class TidyRoomsCard extends LitElement {
     else if (this._error) body = html`<div class="message">${this._error}</div>`;
     else if (!snap) body = html`<div class="message">${t("card.loading")}</div>`;
     else if (!snap.loaded) body = html`<div class="message">${t("card.not_loaded")}</div>`;
-    else body = this._content(snap, formatContext(this.hass, t, this._now));
+    else body = this._content(snap, formatContext(this.hass, t, this._now, snap.work_mode_entity));
     return html`<ha-card>${body}</ha-card>`;
   }
 
@@ -248,7 +248,7 @@ export class TidyRoomsCard extends LitElement {
         : (robot.state ?? "");
     const job = snap.job;
     const sub = job
-      ? `${t(`job.title_${job.kind}`, { room: job.room })} · ${formatDuration(
+      ? `${t("job.title", { mode: ctx.mode(job.work_mode), room: job.room })} · ${formatDuration(
           ctx.now.getTime() - new Date(job.created).getTime(),
           t,
         )}`
@@ -295,26 +295,7 @@ export class TidyRoomsCard extends LitElement {
               <div class="detail">${detail}</div>
             </div>
             <div class="passes">
-              ${
-                room.full_per_day
-                  ? html`<tr-passes
-                      .done=${room.full_today}
-                      .target=${room.full_per_day}
-                      icon="mdi:water"
-                      .label=${t("kind.full")}
-                    ></tr-passes>`
-                  : nothing
-              }
-              ${
-                room.vacuum_per_day
-                  ? html`<tr-passes
-                      .done=${room.vacuum_today}
-                      .target=${room.vacuum_per_day}
-                      icon="mdi:broom"
-                      .label=${t("kind.vacuum_passes")}
-                    ></tr-passes>`
-                  : nothing
-              }
+              <tr-passes .passes=${room.passes} .ctx=${ctx}></tr-passes>
             </div>
           </div>`;
         })}

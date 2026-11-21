@@ -6,8 +6,7 @@ import { property, state } from "lit/decorators.js";
 import "../components/tr-switch";
 import { deleteRoom, errorMessage, reorderRooms, setRoomEnabled } from "../api";
 import { confirmDialog } from "../components/tr-confirm";
-import { type FormatContext, formatClock, statusIcon, statusLabel, statusTone } from "../format";
-import { fanSpeedLabel } from "../form";
+import { type FormatContext, passWindow, statusIcon, statusLabel, statusTone } from "../format";
 import { navigate, notify, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
 import type { HomeAssistant, LoadedSnapshot, RoomSnapshot } from "../types";
@@ -91,6 +90,9 @@ export class TrViewRooms extends LitElement {
         font-size: 0.85rem;
         color: var(--tr-muted);
       }
+      .summary .warn {
+        color: var(--warning-color, #ffa600);
+      }
       .summary span + span::before {
         content: " · ";
       }
@@ -142,10 +144,14 @@ export class TrViewRooms extends LitElement {
       : room.proxy_sensors.length
         ? t("rooms.proxy", { n: room.proxy_sensors.length })
         : t("rooms.no_sensors");
-    const targets = t("rooms.targets", { full: room.full_per_day, vacuum: room.vacuum_per_day });
-    const deadlines = [room.full_deadline, room.vacuum_deadline]
-      .map((d) => (d ? formatClock(d, this.ctx) : "–"))
-      .join(" / ");
+    const program = room.passes.length
+      ? t("rooms.program", {
+          n: room.passes.length,
+          passes: room.passes
+            .map((p) => `${this.ctx.mode(p.work_mode)} ${passWindow(p, this.ctx)}`)
+            .join(", "),
+        })
+      : t("rooms.no_program");
     return html`<li class=${room.enabled ? "" : "off"}>
       <div class="order">
         <button
@@ -176,19 +182,7 @@ export class TrViewRooms extends LitElement {
           >
         </div>
         <div class="summary">
-          <span>${sensors}</span><span>${targets}</span
-          ><span>${t("rooms.gap", { n: room.min_gap_hours })}</span
-          ><span>${t("rooms.deadlines", { times: deadlines })}</span>
-          ${
-            room.fan_speed
-              ? html`<span
-                  >${t("rooms.fan", {
-                    speed: fanSpeedLabel(this.hass, this.snapshot.robot.entity_id, room.fan_speed),
-                  })}</span
-                >`
-              : nothing
-          }
-          ${room.full_mode || room.vacuum_mode ? html`<span>${t("rooms.own_modes")}</span>` : nothing}
+          <span>${sensors}</span><span class=${room.passes.length ? "" : "warn"}>${program}</span>
           ${room.custom_action ? html`<span>${t("rooms.custom_action")}</span>` : nothing}
         </div>
       </div>

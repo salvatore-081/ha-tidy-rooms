@@ -22,7 +22,7 @@ describe("labelRobotOptions", () => {
     const [fan, mode, other] = labelRobotOptions(
       [
         select("fan_speed", ["normal", "max_plus"]),
-        select("full_mode", ["vacuum", "mop_after_vacuum"]),
+        select("work_mode", ["vacuum", "mop_after_vacuum"]),
         select("wake_days", ["sat"]),
       ],
       h,

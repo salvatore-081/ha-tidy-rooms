@@ -1,11 +1,11 @@
 // WebSocket commands of the integration (custom_components/tidy_rooms/websocket_api.py).
 
 import type {
-  CleanKind,
   EntrySummary,
   FormField,
   HomeAssistant,
   JobRecord,
+  RoomForm,
   SaveResult,
   Snapshot,
 } from "./types";
@@ -33,7 +33,7 @@ export const fetchHistory = (hass: HomeAssistant, entryId: string, days: number,
   });
 
 export const fetchRoomForm = (hass: HomeAssistant, entryId: string, roomId?: string) =>
-  hass.callWS<{ schema: FormField[]; values: Record<string, unknown> }>({
+  hass.callWS<RoomForm>({
     type: "tidy_rooms/schema",
     entry_id: entryId,
     form: "room",
@@ -90,8 +90,19 @@ export const saveSettings = (hass: HomeAssistant, entryId: string, data: Record<
 export const setEnabled = (hass: HomeAssistant, entryId: string, enabled: boolean) =>
   hass.callWS<null>({ type: "tidy_rooms/set_enabled", entry_id: entryId, enabled });
 
-export const cleanNow = (hass: HomeAssistant, entryId: string, roomId: string, kind: CleanKind) =>
-  hass.callWS<null>({ type: "tidy_rooms/clean_now", entry_id: entryId, room_id: roomId, kind });
+/** Clean a room now with a work mode (null: leave the robot's mode as it is). */
+export const cleanNow = (
+  hass: HomeAssistant,
+  entryId: string,
+  roomId: string,
+  workMode: string | null,
+) =>
+  hass.callWS<null>({
+    type: "tidy_rooms/clean_now",
+    entry_id: entryId,
+    room_id: roomId,
+    work_mode: workMode,
+  });
 
 export const stopJob = (hass: HomeAssistant, entryId: string) =>
   hass.callWS<null>({ type: "tidy_rooms/stop_job", entry_id: entryId });

@@ -1,7 +1,15 @@
 // Pure formatting helpers: times, durations and the texts that explain a room.
 
+import { workModeLabel } from "./form";
 import type { Localize } from "./localize";
-import type { HomeAssistant, LoadedSnapshot, RoomSnapshot, RoomStatus } from "./types";
+import type {
+  HomeAssistant,
+  LoadedSnapshot,
+  Outlook,
+  PassSnapshot,
+  RoomSnapshot,
+  RoomStatus,
+} from "./types";
 
 export interface FormatContext {
   language: string;
@@ -9,12 +17,15 @@ export interface FormatContext {
   hour12?: boolean;
   now: Date;
   t: Localize;
+  /** The name of a work mode; null: the robot's own mode, left as it is. */
+  mode: (value: string | null | undefined) => string;
 }
 
 export const formatContext = (
   hass: HomeAssistant,
   t: Localize,
   now = new Date(),
+  workModeEntity?: string | null,
 ): FormatContext => {
   const fmt = hass.locale?.time_format;
   return {
@@ -23,6 +34,7 @@ export const formatContext = (
     hour12: fmt === "12" ? true : fmt === "24" ? false : undefined,
     now,
     t,
+    mode: (value) => (value ? workModeLabel(hass, workModeEntity, value) : t("mode.robot")),
   };
 };
 
@@ -115,6 +127,7 @@ export const statusIcon = (room: RoomSnapshot): string => {
   const icons: Record<RoomStatus, string> = {
     disabled: "mdi:pause-circle-outline",
     done: "mdi:check-circle-outline",
+    waiting_window: "mdi:clock-start",
     waiting_gap: "mdi:timer-sand",
     waiting_occupied: "mdi:account-clock-outline",
     waiting_quiet_hours: "mdi:weather-night",
@@ -169,12 +182,16 @@ export const waitText = (room: RoomSnapshot, snap: LoadedSnapshot, ctx: FormatCo
   switch (room.status) {
     case "cleaning":
       return snap.job
-        ? t(`wait.cleaning_${snap.job.kind}`) + (snap.job.quiet ? ` · ${t("wait.quiet")}` : "")
+        ? t("wait.cleaning", { mode: ctx.mode(snap.job.work_mode) }) +
+            (snap.job.quiet ? ` · ${t("wait.quiet")}` : "")
         : t("status.cleaning");
     case "done":
-      return t("wait.done");
+      if (ol.total === 0) return t("wait.nothing_today");
+      return ol.skipped ? t("wait.done_skipped", { n: ol.skipped }) : t("wait.done");
     case "disabled":
       return t("wait.disabled");
+    case "waiting_window":
+      return t("wait.window", { time: formatTime(ol.earliest, ctx) });
     case "waiting_gap":
       return t("wait.gap", { time: formatTime(ol.earliest, ctx) });
     case "waiting_quiet_hours":
@@ -205,33 +222,88 @@ export const waitText = (room: RoomSnapshot, snap: LoadedSnapshot, ctx: FormatCo
   }
 };
 
-/** When the next pass can start: "Vacuum from 15:20", "Vacuum and mop now"... */
+/** "Vacuum (2/3)": the work mode of a pass and where it is in today's program. */
+export const passLabel = (ol: Outlook, ctx: FormatContext): string =>
+  ol.total > 1
+    ? ctx.t("pass.label", { mode: ctx.mode(ol.work_mode), n: ol.position, total: ol.total })
+    : ctx.mode(ol.work_mode);
+
+/** When the next pass can start: "Vacuum (2/3) from 15:20", "Vacuum now"... */
 export const outlookText = (room: RoomSnapshot, ctx: FormatContext): string => {
   const { t } = ctx;
   const ol = room.outlook;
   if (!room.enabled || room.action_error) return "";
-  if (ol.kind === null) return t("outlook.all_done");
-  const kind = t(`kind.${ol.kind}`);
-  if (ol.reason === "not_today") return t("outlook.not_today", { kind });
-  if (ol.earliest === null) return t("outlook.when_free", { kind });
-  const forced = ol.deadline !== null && ol.earliest >= ol.deadline;
+  if (ol.pass_id === null) return t(ol.total === 0 ? "outlook.nothing_today" : "outlook.all_done");
+  const what = passLabel(ol, ctx);
+  if (ol.reason === "not_today") return t("outlook.not_today", { what });
+  if (ol.earliest === null) return t("outlook.when_free", { what });
+  const forced = ol.forced && ol.deadline !== null && ol.earliest >= ol.deadline;
   const at = new Date(ol.earliest).getTime();
   if (at <= ctx.now.getTime() + 30_000) {
-    if (ol.reason === "awake") return t("outlook.after_wake_up", { kind });
-    return t(forced ? "outlook.now_forced" : "outlook.now", { kind });
+    if (ol.reason === "awake") return t("outlook.after_wake_up", { what });
+    return t(forced ? "outlook.now_forced" : "outlook.now", { what });
   }
   return t(forced ? "outlook.forced_at" : "outlook.from", {
-    kind,
+    what,
     time: formatTime(ol.earliest, ctx),
   });
 };
 
-/** The last pass of the room, either kind. */
-export const lastPass = (room: RoomSnapshot): { at: string; kind: "full" | "vacuum" } | null => {
-  const full = room.last_full;
-  const vacuum = room.last_vacuum;
-  if (!full && !vacuum) return null;
-  // A full pass also sets last_vacuum: equal times mean a full pass.
-  if (full && (!vacuum || full >= vacuum)) return { at: full, kind: "full" };
-  return { at: vacuum as string, kind: "vacuum" };
+/** The window of a pass: "09:00–12:00", "until 19:00", "from 17:00", "any time". */
+export const passWindow = (p: PassSnapshot, ctx: FormatContext): string => {
+  const { t } = ctx;
+  const start = formatClock(p.start, ctx);
+  const end = formatClock(p.end, ctx);
+  if (start && end) return t("pass.window", { start, end });
+  if (end) return t("pass.until", { time: end });
+  if (start) return t("pass.from", { time: start });
+  return t("pass.any_time");
 };
+
+/** Minutes since midnight of a time of day ("19:00:00"), or null. */
+export const clockMinutes = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const [h, m] = value.split(":").map(Number);
+  return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
+};
+
+/** Minutes since midnight of a moment, in the time zone of Home Assistant. */
+export const dayMinutes = (
+  iso: string | Date | null | undefined,
+  ctx: FormatContext,
+): number | null => {
+  if (!iso) return null;
+  const date = typeof iso === "string" ? new Date(iso) : iso;
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: safeZone(ctx.timeZone),
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return get("hour") * 60 + get("minute");
+};
+
+/** The pass a cleaning with `mode` counts as (as the integration decides), if any. */
+export const manualTarget = (
+  room: RoomSnapshot,
+  mode: string | null,
+  anyMode = false,
+): PassSnapshot | undefined =>
+  room.passes.find(
+    (p) => (p.status === "pending" || p.status === "skipped") && (anyMode || p.work_mode === mode),
+  );
+
+/** The work mode offered first by "clean now": the next pass's, else the last pass's. */
+export const defaultCleanMode = (room: RoomSnapshot): string | null =>
+  room.outlook.pass_id !== null
+    ? room.outlook.work_mode
+    : (room.passes[room.passes.length - 1]?.work_mode ?? null);
+
+/** The work mode of a logged job; jobs of 0.3.0 have a kind instead. */
+export const jobMode = (
+  job: { work_mode?: string | null; kind?: string | null },
+  ctx: FormatContext,
+): string =>
+  job.work_mode ? ctx.mode(job.work_mode) : job.kind ? ctx.t(`kind.${job.kind}`) : ctx.mode(null);

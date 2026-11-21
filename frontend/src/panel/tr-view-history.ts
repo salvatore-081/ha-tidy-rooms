@@ -4,7 +4,7 @@ import { element } from "../define";
 import { LitElement, type PropertyValues, css, html, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
 import { errorMessage, fetchHistory } from "../api";
-import { type FormatContext, formatDayTime, formatDuration, formatTime } from "../format";
+import { type FormatContext, formatDayTime, formatDuration, formatTime, jobMode } from "../format";
 import { shared, tokens } from "../styles";
 import type { HomeAssistant, JobRecord, LoadedSnapshot } from "../types";
 import { RESULT_TONE } from "./tr-room-editor";
@@ -12,31 +12,34 @@ import { RESULT_TONE } from "./tr-room-editor";
 export interface RoomSummary {
   room_id: string;
   room: string;
-  full: number;
-  vacuum: number;
+  /** Jobs done that counted as a pass of the program. */
+  passes: number;
+  /** Jobs done by hand that matched no pass. */
+  extra: number;
   interrupted: number;
   failed: number;
   stopped: number;
   minutes: number;
 }
 
-/** Totals per room; a full pass counts once, as full. */
+/** Totals per room: passes done, extra cleanings, problems and time. */
 export const summarize = (jobs: JobRecord[]): RoomSummary[] => {
   const byRoom = new Map<string, RoomSummary>();
   for (const job of jobs) {
     const s = byRoom.get(job.room_id) ?? {
       room_id: job.room_id,
       room: job.room,
-      full: 0,
-      vacuum: 0,
+      passes: 0,
+      extra: 0,
       interrupted: 0,
       failed: 0,
       stopped: 0,
       minutes: 0,
     };
     if (job.result === "done") {
-      if (job.kind === "full") s.full += 1;
-      else s.vacuum += 1;
+      // Jobs of 0.3.0 (with a kind) always counted.
+      if (job.pass_id || job.kind) s.passes += 1;
+      else s.extra += 1;
       s.minutes += Math.max(0, (Date.parse(job.ended) - Date.parse(job.started)) / 60_000);
     } else {
       s[job.result] += 1;
@@ -193,9 +196,8 @@ export class TrViewHistory extends LitElement {
   protected willUpdate(changed: PropertyValues) {
     // Reload when a job ends (the snapshot's last result of a room changes).
     const key =
-      this.snapshot.rooms
-        .map((r) => `${r.id}:${r.last_full}:${r.last_vacuum}:${r.last_result}`)
-        .join("|") + (this.snapshot.job ? "J" : "");
+      this.snapshot.rooms.map((r) => `${r.id}:${r.last_clean}:${r.last_result}`).join("|") +
+      (this.snapshot.job ? "J" : "");
     if (changed.has("_days") || changed.has("_room") || key !== this._lastJobKey) {
       this._lastJobKey = key;
       this._load();
@@ -268,8 +270,16 @@ export class TrViewHistory extends LitElement {
         return html`<div class="card stat">
           <div class="room">${s.room}</div>
           <div class="nums">
-            <span title=${t("kind.full")}><ha-icon icon="mdi:water"></ha-icon>${s.full}</span>
-            <span title=${t("kind.vacuum")}><ha-icon icon="mdi:broom"></ha-icon>${s.vacuum}</span>
+            <span title=${t("history.passes")}
+              ><ha-icon icon="mdi:check-circle-outline"></ha-icon>${s.passes}</span
+            >
+            ${
+              s.extra
+                ? html`<span title=${t("history.extra")}
+                    ><ha-icon icon="mdi:plus-circle-outline"></ha-icon>${s.extra}</span
+                  >`
+                : nothing
+            }
             <span title=${t("history.total_time")}
               ><ha-icon icon="mdi:timer-outline"></ha-icon
               >${s.minutes > 0 ? formatDuration(s.minutes * 60_000, t) : "–"}</span
@@ -315,7 +325,7 @@ export class TrViewHistory extends LitElement {
           <tr>
             <th>${t("history.started")}</th>
             <th>${t("history.room")}</th>
-            <th>${t("history.kind")}</th>
+            <th>${t("history.mode")}</th>
             <th>${t("history.duration")}</th>
             <th>${t("history.result")}</th>
             <th><span class="sr-only">${t("history.details")}</span></th>
@@ -329,7 +339,7 @@ export class TrViewHistory extends LitElement {
                   ${formatDayTime(job.started, this.ctx)}–${formatTime(job.ended, this.ctx)}
                 </td>
                 <td>${job.room}</td>
-                <td>${t(`kind.${job.kind}`)}</td>
+                <td>${jobMode(job, this.ctx)}</td>
                 <td class="num">${this._duration(job)}</td>
                 <td>
                   <span class="chip tone-${RESULT_TONE[job.result]}"
@@ -351,7 +361,7 @@ export class TrViewHistory extends LitElement {
         (job) =>
           html`<div class="item">
             <div class="main">
-              ${job.room} · ${t(`kind.${job.kind}`)}
+              ${job.room} · ${jobMode(job, this.ctx)}
               <div class="secondary">
                 ${formatDayTime(job.started, this.ctx)} · ${this._duration(job)} ${this._flags(job)}
               </div>

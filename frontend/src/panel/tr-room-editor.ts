@@ -4,19 +4,14 @@ import { element } from "../define";
 import { LitElement, type PropertyValues, css, html, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
 import "../components/tr-room-tile";
+import "../components/tr-program-editor";
 import { deleteRoom, errorMessage, fetchHistory, fetchRoomForm, saveRoom } from "../api";
 import { confirmDialog } from "../components/tr-confirm";
-import { type FormatContext, formatDayTime, formatDuration } from "../format";
-import {
-  fanSpeedLabel,
-  formCallbacks,
-  labelRobotOptions,
-  splitErrors,
-  workModeLabel,
-} from "../form";
+import { type FormatContext, formatDayTime, formatDuration, jobMode } from "../format";
+import { formCallbacks, labelRobotOptions, splitErrors } from "../form";
 import { navigate, notify, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
-import type { FormField, HomeAssistant, JobRecord, LoadedSnapshot } from "../types";
+import type { FormField, HomeAssistant, JobRecord, LoadedSnapshot, PassData } from "../types";
 
 // Sections of the form, by field name (fields not listed go to the last one).
 const SECTIONS: { key: string; icon: string; fields: string[] }[] = [
@@ -26,17 +21,8 @@ const SECTIONS: { key: string; icon: string; fields: string[] }[] = [
     icon: "mdi:motion-sensor",
     fields: ["occupancy_sensors", "proxy_sensors", "empty_minutes"],
   },
-  {
-    key: "targets",
-    icon: "mdi:target",
-    fields: ["full_per_day", "vacuum_per_day", "min_gap_hours"],
-  },
-  {
-    key: "deadlines",
-    icon: "mdi:clock-alert-outline",
-    fields: ["full_deadline", "vacuum_deadline"],
-  },
-  { key: "robot", icon: "mdi:robot-vacuum", fields: ["fan_speed", "full_mode", "vacuum_mode"] },
+  // The program is not an ha-form section: tr-program-editor.
+  { key: "program", icon: "mdi:calendar-check-outline", fields: ["-"] },
   { key: "advanced", icon: "mdi:code-braces", fields: [] },
 ];
 
@@ -50,6 +36,10 @@ export class TrRoomEditor extends LitElement {
 
   @state() private _schema?: FormField[];
   @state() private _data: Record<string, unknown> = {};
+  @state() private _passSchema: FormField[] = [];
+  @state() private _passes: PassData[] = [];
+  @state() private _passDefaults: Record<string, unknown> = {};
+  @state() private _maxPasses = 6;
   @state() private _errors: Record<string, string> = {};
   @state() private _loadError?: string;
   @state() private _saving = false;
@@ -208,6 +198,10 @@ export class TrRoomEditor extends LitElement {
       const form = await fetchRoomForm(this.hass, this.snapshot.entry_id, this.roomId);
       this._schema = form.schema;
       this._data = { ...form.values };
+      this._passSchema = form.pass_schema;
+      this._passes = form.passes.map((p) => ({ ...p }));
+      this._passDefaults = form.pass_defaults;
+      this._maxPasses = form.max_passes;
     } catch (err) {
       this._loadError = errorMessage(err);
     }
@@ -269,11 +263,15 @@ export class TrRoomEditor extends LitElement {
         ${this.formReady || !this._schema ? t("panel.loading") : t("editor.form_unavailable")}
       </div>`;
     const cb = formCallbacks(t);
-    const { base, fields } = splitErrors(this._errors);
+    const { base, fields: all } = splitErrors(this._errors);
+    const fields = Object.fromEntries(
+      Object.entries(all).filter(([key]) => key !== "passes" && !key.startsWith("passes.")),
+    );
     const listed = new Set(SECTIONS.flatMap((s) => s.fields));
     return html`
       ${base ? html`<div class="error-box">${cb.computeError(base)}</div>` : nothing}
       ${SECTIONS.map((section) => {
+        if (section.key === "program") return this._program(all);
         const schema = labelRobotOptions(
           this._schema!.filter((f) =>
             section.fields.length ? section.fields.includes(f.name) : !listed.has(f.name),
@@ -311,9 +309,7 @@ export class TrRoomEditor extends LitElement {
           ${
             section.key === "area"
               ? html`<div class="card-content hint">${t("editor.area_hint")}</div>`
-              : section.key === "robot"
-                ? html`<div class="card-content hint">${this._robotHint()}</div>`
-                : nothing
+              : nothing
           }
           ${form}
         </div>`;
@@ -337,22 +333,36 @@ export class TrRoomEditor extends LitElement {
     `;
   }
 
-  /** What an empty robot field means: the global settings, by name. */
-  private _robotHint(): string {
+  private _program(errors: Record<string, string>) {
     const { t } = this.ctx;
     const s = this.snapshot;
-    const none = t("editor.robot_unset");
-    const fan = s.normal_fan_speed
-      ? fanSpeedLabel(this.hass, s.robot.entity_id, s.normal_fan_speed)
-      : none;
-    const mode = (v: string | null) => (v ? workModeLabel(this.hass, s.work_mode_entity, v) : none);
-    let text = t("editor.robot_hint", {
-      fan,
-      full: mode(s.full_mode_option),
-      vacuum: mode(s.vacuum_mode_option),
-    });
-    if (!s.work_mode_entity) text += ` ${t("editor.robot_no_modes")}`;
-    return text;
+    const schema = labelRobotOptions(
+      this._passSchema,
+      this.hass,
+      s.robot.entity_id,
+      s.work_mode_entity,
+    );
+    return html`<div class="card section">
+      <h2><ha-icon icon="mdi:calendar-check-outline"></ha-icon>${t("editor.section_program")}</h2>
+      <div class="card-content hint">
+        ${t("editor.program_hint")}
+        ${s.work_mode_entity ? nothing : html` ${t("editor.program_no_modes")}`}
+      </div>
+      <div class="card-content">
+        <tr-program-editor
+          .hass=${this.hass}
+          .ctx=${this.ctx}
+          .schema=${schema}
+          .passes=${this._passes}
+          .defaults=${this._passDefaults}
+          .errors=${errors}
+          .max=${this._maxPasses}
+          .disabled=${this._saving}
+          @passes-changed=${(ev: CustomEvent<{ passes: PassData[] }>) =>
+            (this._passes = ev.detail.passes)}
+        ></tr-program-editor>
+      </div>
+    </div>`;
   }
 
   private _jobsCard() {
@@ -370,10 +380,10 @@ export class TrRoomEditor extends LitElement {
                   t,
                 );
                 return html`<div class="job">
-                  <ha-icon icon=${job.kind === "full" ? "mdi:water" : "mdi:broom"}></ha-icon>
+                  <ha-icon icon=${job.manual ? "mdi:gesture-tap" : "mdi:robot-vacuum"}></ha-icon>
                   <div class="when">
                     ${formatDayTime(job.started, this.ctx)}
-                    <div class="secondary">${t(`kind.${job.kind}`)} · ${duration}</div>
+                    <div class="secondary">${jobMode(job, this.ctx)} · ${duration}</div>
                   </div>
                   <span class="chip tone-${RESULT_TONE[job.result]}"
                     >${t(`result.${job.result}`)}</span
@@ -395,7 +405,12 @@ export class TrRoomEditor extends LitElement {
     const { t } = this.ctx;
     this._saving = true;
     try {
-      const res = await saveRoom(this.hass, this.snapshot.entry_id, this._data, this.roomId);
+      const res = await saveRoom(
+        this.hass,
+        this.snapshot.entry_id,
+        { ...this._data, passes: this._passes },
+        this.roomId,
+      );
       if (res.errors) {
         this._errors = res.errors;
         return;

@@ -192,13 +192,14 @@ export class TrRobotCard extends LitElement {
     const elapsed = formatDuration(this.ctx.now.getTime() - new Date(job.created).getTime(), t);
     const flags = [
       job.manual ? t("job.manual") : job.forced ? t("job.forced") : "",
+      job.manual && job.pass_id === null ? t("job.not_counted") : "",
       job.quiet ? t("job.quiet") : "",
       job.attempts > 1 ? t("job.attempts", { n: job.attempts }) : "",
     ].filter(Boolean);
     return html`<div class="line">
-      <ha-icon icon=${job.kind === "full" ? "mdi:water" : "mdi:broom"}></ha-icon>
+      <ha-icon icon="mdi:robot-vacuum"></ha-icon>
       <div class="text">
-        ${t(`job.title_${job.kind}`, { room: job.room })}
+        ${t("job.title", { mode: this.ctx.mode(job.work_mode), room: job.room })}
         <div class="secondary">
           ${t(`job.phase_${job.phase}`)} · ${t("job.since", { duration: elapsed })}
           ${flags.length ? html` · ${flags.join(" · ")}` : nothing}
@@ -221,7 +222,7 @@ export class TrRobotCard extends LitElement {
     const room = s.rooms.find((r) => r.id === s.next_room);
     if (!room || s.job?.room_id === room.id) {
       const allDone =
-        s.rooms.length > 0 && s.rooms.every((r) => !r.enabled || r.outlook.kind === null);
+        s.rooms.length > 0 && s.rooms.every((r) => !r.enabled || r.outlook.pass_id === null);
       return s.rooms.length && !s.job
         ? html`<div class="line">
             <ha-icon icon=${allDone ? "mdi:check-all" : "mdi:calendar-clock"}></ha-icon>

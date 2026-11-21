@@ -18,13 +18,19 @@ import {
   stopJob,
   subscribeSnapshot,
 } from "../api";
-import { confirmDialog } from "../components/tr-confirm";
-import { type FormatContext, formatContext } from "../format";
+import { choiceDialog, confirmDialog } from "../components/tr-confirm";
+import {
+  type FormatContext,
+  defaultCleanMode,
+  formatContext,
+  manualTarget,
+  passWindow,
+} from "../format";
 import { loadHaForm } from "../load-ha-elements";
 import { type Localize, localizer } from "../localize";
 import { BASE, navigate, notify, panelPath } from "../nav";
 import { shared, tokens } from "../styles";
-import type { CleanKind, EntrySummary, HomeAssistant, LoadedSnapshot, Snapshot } from "../types";
+import type { EntrySummary, HomeAssistant, LoadedSnapshot, Snapshot } from "../types";
 
 type Tab = "overview" | "rooms" | "history" | "settings";
 const TABS: Tab[] = ["overview", "rooms", "history", "settings"];
@@ -165,7 +171,7 @@ export class TidyRoomsPanel extends LitElement {
   }
 
   private get _ctx(): FormatContext {
-    return formatContext(this.hass, this._t, this._now);
+    return formatContext(this.hass, this._t, this._now, this._loaded?.work_mode_entity);
   }
 
   connectedCallback() {
@@ -376,20 +382,43 @@ export class TidyRoomsPanel extends LitElement {
     }
   }
 
-  private async _cleanNow(ev: CustomEvent<{ room: string; kind: CleanKind }>) {
+  private async _cleanNow(ev: CustomEvent<{ room: string }>) {
     const snap = this._loaded;
     const room = snap?.rooms.find((r) => r.id === ev.detail.room);
     if (!snap || !room) return;
     const t = this._t;
-    const ok = await confirmDialog(this.renderRoot as ShadowRoot, {
-      title: t(`confirm.clean_title_${ev.detail.kind}`, { room: room.name }),
-      text: t("confirm.clean_text"),
-      confirm: t("confirm.clean_confirm"),
-      cancel: t("common.cancel"),
-    });
-    if (!ok) return;
+    const ctx = this._ctx;
+    const counts = (target: ReturnType<typeof manualTarget>) =>
+      target?.position
+        ? t("confirm.clean_counts", { n: target.position, window: passWindow(target, ctx) })
+        : t("confirm.clean_extra");
+    let mode: string | null = null;
+    if (snap.work_mode_entity && snap.work_modes.length) {
+      const picked = await choiceDialog(this.renderRoot as ShadowRoot, {
+        title: t("confirm.clean_title", { room: room.name }),
+        text: t("confirm.clean_text_modes"),
+        confirm: t("confirm.clean_confirm"),
+        cancel: t("common.cancel"),
+        choices: snap.work_modes.map((m) => ({
+          value: m,
+          label: ctx.mode(m),
+          hint: counts(manualTarget(room, m)),
+        })),
+        selected: defaultCleanMode(room) ?? undefined,
+      });
+      if (picked === null) return;
+      mode = picked;
+    } else {
+      const ok = await confirmDialog(this.renderRoot as ShadowRoot, {
+        title: t("confirm.clean_title", { room: room.name }),
+        text: `${t("confirm.clean_text")} ${counts(manualTarget(room, null, true))}`,
+        confirm: t("confirm.clean_confirm"),
+        cancel: t("common.cancel"),
+      });
+      if (!ok) return;
+    }
     try {
-      await cleanNow(this.hass, snap.entry_id, room.id, ev.detail.kind);
+      await cleanNow(this.hass, snap.entry_id, room.id, mode);
       notify(this, t("toast.clean_started", { room: room.name }));
     } catch (err) {
       notify(this, errorCode(err) === "robot_busy" ? t("error.robot_busy") : errorMessage(err));

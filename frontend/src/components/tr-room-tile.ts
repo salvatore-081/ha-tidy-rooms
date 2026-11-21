@@ -1,13 +1,13 @@
-// One room: status, why it waits, today's passes, last pass and outlook.
+// One room: status, why it waits, today's passes and their day, last cleaning, outlook.
 
 import { element } from "../define";
 import { LitElement, css, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import "./tr-passes";
+import "./tr-timeline";
 import {
   type FormatContext,
   formatDayTime,
-  lastPass,
   outlookText,
   statusIcon,
   statusLabel,
@@ -15,7 +15,7 @@ import {
   waitText,
 } from "../format";
 import { shared, tokens } from "../styles";
-import type { CleanKind, HomeAssistant, LoadedSnapshot, RoomSnapshot } from "../types";
+import type { HomeAssistant, LoadedSnapshot, RoomSnapshot } from "../types";
 
 @element("tr-room-tile")
 export class TrRoomTile extends LitElement {
@@ -92,9 +92,13 @@ export class TrRoomTile extends LitElement {
       }
       .passes {
         display: flex;
-        flex-wrap: wrap;
-        gap: 6px 20px;
+        align-items: center;
+        gap: 12px;
         margin-top: 12px;
+      }
+      .passes tr-timeline {
+        flex: 1;
+        min-width: 0;
       }
       .facts {
         display: grid;
@@ -131,7 +135,6 @@ export class TrRoomTile extends LitElement {
     const r = this.room;
     const { t } = this.ctx;
     const tone = statusTone(r);
-    const last = lastPass(r);
     const outlook = outlookText(r, this.ctx);
     const area = this.hass.areas?.[r.area_id];
     const busy = this.snapshot.job !== null || !this.snapshot.robot.available;
@@ -159,30 +162,19 @@ export class TrRoomTile extends LitElement {
         </div>
         <div class="body">
           <div class="wait">${waitText(r, this.snapshot, this.ctx)}</div>
-          <div class="passes">
-            ${
-              r.full_per_day || r.full_today
-                ? html`<tr-passes
-                    .done=${r.full_today}
-                    .target=${r.full_per_day}
-                    icon="mdi:water"
-                    .label=${t("kind.full")}
-                    title=${t("kind.full")}
-                  ></tr-passes>`
-                : nothing
-            }
-            ${
-              r.vacuum_per_day || r.vacuum_today
-                ? html`<tr-passes
-                    .done=${r.vacuum_today}
-                    .target=${r.vacuum_per_day}
-                    icon="mdi:broom"
-                    .label=${t("kind.vacuum_passes")}
-                    title=${t("kind.vacuum_passes")}
-                  ></tr-passes>`
-                : nothing
-            }
-          </div>
+          ${
+            r.passes.some((p) => p.status !== "not_today")
+              ? html`<div class="passes">
+                  <tr-passes .passes=${r.passes} .ctx=${this.ctx}></tr-passes>
+                  <tr-timeline
+                    .passes=${r.passes}
+                    .ctx=${this.ctx}
+                    .quietStart=${this.snapshot.quiet_start}
+                    .quietEnd=${this.snapshot.quiet_end}
+                  ></tr-timeline>
+                </div>`
+              : nothing
+          }
           <div class="facts">
             ${
               outlook && r.status !== "cleaning"
@@ -191,8 +183,8 @@ export class TrRoomTile extends LitElement {
             }
             <div>
               <ha-icon icon="mdi:history"></ha-icon>${
-                last
-                  ? t(`room.last_${last.kind}`, { when: formatDayTime(last.at, this.ctx) })
+                r.last_clean
+                  ? t("room.last_clean", { when: formatDayTime(r.last_clean, this.ctx) })
                   : t("room.never")
               }
               ${
@@ -206,19 +198,8 @@ export class TrRoomTile extends LitElement {
         ${
           this.admin
             ? html`<div class="actions">
-                ${
-                  r.full_per_day
-                    ? html`<button
-                        class="btn"
-                        ?disabled=${busy}
-                        @click=${() => this._clean("full")}
-                      >
-                        <ha-icon icon="mdi:water"></ha-icon>${t("room.clean_full")}
-                      </button>`
-                    : nothing
-                }
-                <button class="btn" ?disabled=${busy} @click=${() => this._clean("vacuum")}>
-                  <ha-icon icon="mdi:broom"></ha-icon>${t("room.clean_vacuum")}
+                <button class="btn" ?disabled=${busy} @click=${this._clean}>
+                  <ha-icon icon="mdi:play-circle-outline"></ha-icon>${t("room.clean_now")}
                 </button>
               </div>`
             : html`<div style="height:14px"></div>`
@@ -244,10 +225,10 @@ export class TrRoomTile extends LitElement {
     }
   }
 
-  private _clean(kind: CleanKind) {
+  private _clean() {
     this.dispatchEvent(
       new CustomEvent("clean-now", {
-        detail: { room: this.room.id, kind },
+        detail: { room: this.room.id },
         bubbles: true,
         composed: true,
       }),
