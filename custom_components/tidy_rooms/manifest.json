@@ -1,13 +1,22 @@
 {
   "domain": "tidy_rooms",
   "name": "Tidy Rooms",
-  "codeowners": ["@salvatore-081"],
+  "after_dependencies": [
+    "frontend",
+    "http",
+    "websocket_api"
+  ],
+  "codeowners": [
+    "@salvatore-081"
+  ],
   "config_flow": true,
-  "dependencies": ["vacuum"],
+  "dependencies": [
+    "vacuum"
+  ],
   "documentation": "https://github.com/salvatore-081/ha-tidy-rooms",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/salvatore-081/ha-tidy-rooms/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

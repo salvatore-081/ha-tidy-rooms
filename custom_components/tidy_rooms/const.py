@@ -29,6 +29,8 @@ CONF_JOB_DONE_DELAY: Final = "job_done_delay"
 CONF_BATTERY_ENTITY: Final = "battery_entity"
 CONF_FINISHED_EVENT: Final = "finished_event"
 CONF_JOB_ENTITY: Final = "job_entity"
+# Room priority, as a list of subentry ids (set from the panel)
+CONF_ROOM_ORDER: Final = "room_order"
 
 # Room subentry
 CONF_AREA: Final = "area"

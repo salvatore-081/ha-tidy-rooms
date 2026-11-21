@@ -14,7 +14,10 @@ from custom_components.tidy_rooms.planner import (
     RoomConfig,
     RoomState,
     RoomStatus,
+    WaitReason,
     in_window,
+    next_room,
+    outlook,
     plan,
     should_interrupt,
 )
@@ -189,3 +192,130 @@ def test_should_interrupt() -> None:
     study = RoomConfig("study", "study", proxy_sensors=("binary_sensor.kitchen",))
     assert should_interrupt(study, RoomState(proxy_active=False), normal)
     assert not should_interrupt(study, RoomState(proxy_active=True), normal)
+
+
+# ---------------------------------------------------------------- outlook
+
+
+def test_outlook_empty_room_starts_when_free() -> None:
+    now = at(10)
+    ol = outlook(now, G, sensor_room(), empty_for(4, now))
+    assert ol.kind is CleanKind.FULL
+    assert ol.earliest == at(10, 6)
+    assert ol.reason is WaitReason.EMPTY
+    assert ol.free_at == at(10, 6)
+    assert ol.deadline == at(19)
+    assert (ol.full_left, ol.vacuum_left) == (1, 2)
+
+
+def test_outlook_free_room_starts_now() -> None:
+    now = at(10)
+    ol = outlook(now, G, sensor_room(), empty_for(30, now))
+    assert ol.earliest == now
+    assert ol.reason is None
+
+
+def test_outlook_occupied_room_waits_for_deadline() -> None:
+    now = at(10)
+    ol = outlook(now, G, sensor_room(), RoomState(occupied=True))
+    assert ol.earliest == at(19)
+    assert ol.reason is WaitReason.OCCUPIED
+    assert ol.free_at is None
+
+
+def test_outlook_occupied_without_deadline_is_unknown() -> None:
+    now = at(10)
+    ol = outlook(now, G, sensor_room(full_deadline=None), RoomState(occupied=True))
+    assert ol.earliest is None
+    assert ol.reason is WaitReason.OCCUPIED
+
+
+def test_outlook_occupied_past_deadline_starts_now() -> None:
+    now = at(19, 30)
+    ol = outlook(now, G, sensor_room(), RoomState(occupied=True))
+    assert ol.earliest == now
+    assert ol.reason is None
+
+
+def test_outlook_vacuum_waits_for_gap() -> None:
+    now = at(12)
+    st = empty_for(60, now)
+    st.full_today = st.vacuum_today = 1
+    st.last_full = st.last_vacuum = at(10)
+    ol = outlook(now, G, sensor_room(), st)
+    assert ol.kind is CleanKind.VACUUM
+    assert ol.earliest == at(16)
+    assert ol.reason is WaitReason.GAP
+    assert ol.deadline == at(21, 30)
+
+
+def test_outlook_quiet_hours_until_morning() -> None:
+    now = at(6)
+    ol = outlook(now, G, sensor_room(), empty_for(60, now))
+    assert ol.earliest == at(8)
+    assert ol.reason is WaitReason.QUIET_HOURS
+
+
+def test_outlook_gap_ending_in_quiet_hours_is_not_today() -> None:
+    now = at(20)
+    st = empty_for(60, now)
+    st.full_today = st.vacuum_today = 1
+    st.last_vacuum = at(17)
+    ol = outlook(now, G, sensor_room(), st)
+    assert ol.earliest is None
+    assert ol.reason is WaitReason.NOT_TODAY
+
+
+def test_outlook_done_room() -> None:
+    now = at(20)
+    st = RoomState(full_today=1, vacuum_today=2)
+    ol = outlook(now, G, sensor_room(), st)
+    assert ol.kind is None and ol.earliest is None
+    assert (ol.full_left, ol.vacuum_left) == (0, 0)
+
+
+def test_outlook_not_awake() -> None:
+    now = at(9)
+    ol = outlook(now, G, sensor_room(), empty_for(60, now), awake=False)
+    assert ol.earliest == now
+    assert ol.reason is WaitReason.AWAKE
+
+
+def test_outlook_proxy_room() -> None:
+    now = at(10)
+    cfg = RoomConfig("study", "study", proxy_sensors=("binary_sensor.k",))
+    assert outlook(now, G, cfg, RoomState(proxy_active=True)).earliest == now
+    ol = outlook(now, G, cfg, RoomState(proxy_active=False))
+    assert ol.earliest == at(19)
+    assert ol.reason is WaitReason.OCCUPIED
+
+
+def test_outlook_room_without_sensors() -> None:
+    now = at(10)
+    assert outlook(now, G, RoomConfig("hall", "hall"), RoomState()).earliest == now
+
+
+def test_next_room_prefers_earliest_then_priority() -> None:
+    now = at(10)
+    a = outlook(now, G, sensor_room("a"), empty_for(30, now))
+    b = outlook(now, G, sensor_room("b"), empty_for(8, now))
+    assert next_room({"a": a, "b": b}, ["b", "a"]) == "a"
+    c = outlook(now, G, sensor_room("c"), empty_for(30, now))
+    assert next_room({"a": a, "c": c}, ["c", "a"]) == "c"
+    assert next_room({}, []) is None
+
+
+def test_outlook_utc_timestamps_near_midnight() -> None:
+    """Sensor timestamps in UTC are compared in local time."""
+    from zoneinfo import ZoneInfo
+
+    rome = ZoneInfo("Europe/Rome")
+    now = datetime(2026, 1, 12, 0, 30, tzinfo=rome)  # 23:30 UTC the day before
+    g = GlobalConfig(quiet_start=None, quiet_end=None)
+    st = RoomState(
+        occupied=False,
+        empty_since=(now - timedelta(minutes=5)).astimezone(ZoneInfo("UTC")),
+    )
+    ol = outlook(now, g, sensor_room(), st)
+    assert ol.earliest == now + timedelta(minutes=5)
+    assert ol.earliest.tzinfo == rome

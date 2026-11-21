@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from freezegun.api import FrozenDateTimeFactory
 import pytest
+from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigSubentryData
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import area_registry as ar
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
     async_mock_service,
 )
-
-from homeassistant.config_entries import ConfigSubentryData
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import area_registry as ar
 
 from custom_components.tidy_rooms.const import (
     CONF_AREA,
@@ -23,8 +22,8 @@ from custom_components.tidy_rooms.const import (
     CONF_FULL_DEADLINE,
     CONF_FULL_MODE_OPTION,
     CONF_FULL_PER_DAY,
-    CONF_JOB_ENTITY,
     CONF_JOB_DONE_DELAY,
+    CONF_JOB_ENTITY,
     CONF_MIN_BATTERY,
     CONF_MIN_GAP_HOURS,
     CONF_NORMAL_FAN_SPEED,

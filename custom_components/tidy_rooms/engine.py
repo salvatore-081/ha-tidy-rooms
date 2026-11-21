@@ -2,34 +2,46 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, time, timedelta
 from enum import StrEnum
-import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.components.vacuum import (
     ATTR_FAN_SPEED,
-    DOMAIN as VACUUM_DOMAIN,
     SERVICE_CLEAN_AREA,
     SERVICE_RETURN_TO_BASE,
     SERVICE_SET_FAN_SPEED,
     VacuumActivity,
 )
+from homeassistant.components.vacuum import (
+    DOMAIN as VACUUM_DOMAIN,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_ENTITY_ID, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import Context, Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+)
+from homeassistant.core import (
+    Context,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_change,
     async_track_time_interval,
 )
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import Script, async_validate_actions_config
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
@@ -40,11 +52,11 @@ from .const import (
     CONF_CLEAN_ACTION,
     CONF_EMPTY_MINUTES,
     CONF_FINISHED_EVENT,
-    CONF_JOB_ENTITY,
     CONF_FULL_DEADLINE,
     CONF_FULL_MODE_OPTION,
     CONF_FULL_PER_DAY,
     CONF_JOB_DONE_DELAY,
+    CONF_JOB_ENTITY,
     CONF_MIN_BATTERY,
     CONF_MIN_GAP_HOURS,
     CONF_NORMAL_FAN_SPEED,
@@ -53,6 +65,7 @@ from .const import (
     CONF_QUIET_END,
     CONF_QUIET_FAN_SPEED,
     CONF_QUIET_START,
+    CONF_ROOM_ORDER,
     CONF_START_TIMEOUT,
     CONF_VACUUM,
     CONF_VACUUM_DEADLINE,
@@ -73,6 +86,7 @@ from .const import (
     SUBENTRY_ROOM,
     WEEKDAYS,
 )
+from .history import JobHistory, JobRecord
 from .planner import (
     CleanKind,
     Decision,
@@ -80,7 +94,10 @@ from .planner import (
     Plan,
     RobotState,
     RoomConfig,
+    RoomOutlook,
     RoomState,
+    next_room,
+    outlook,
     plan,
     should_interrupt,
 )
@@ -111,6 +128,50 @@ class Job:
     attempts: int = 1
     docked_since: datetime | None = None
     quiet_applied: bool = False
+    manual: bool = False  # started from a button or the panel
+
+    def serialize(self) -> dict[str, Any]:
+        """For the store: a reload must not forget a running job."""
+        d = self.decision
+        return {
+            "room_id": d.room_id,
+            "kind": d.kind.value,
+            "forced": d.forced,
+            "quiet": d.quiet,
+            "phase": self.phase.value,
+            "started": self.started.isoformat(),
+            "created": self.created.isoformat(),
+            "attempts": self.attempts,
+            "docked_since": _iso(self.docked_since),
+            "quiet_applied": self.quiet_applied,
+            "manual": self.manual,
+        }
+
+    @classmethod
+    def restore(cls, data: dict[str, Any]) -> Job | None:
+        """Inverse of serialize; None if the data is unusable."""
+        try:
+            started = _dt(data["started"])
+            created = _dt(data["created"])
+            if started is None or created is None:
+                return None
+            return cls(
+                decision=Decision(
+                    data["room_id"],
+                    CleanKind(data["kind"]),
+                    forced=bool(data["forced"]),
+                    quiet=bool(data["quiet"]),
+                ),
+                phase=JobPhase(data["phase"]),
+                started=started,
+                created=created,
+                attempts=int(data["attempts"]),
+                docked_since=_dt(data.get("docked_since")),
+                quiet_applied=bool(data.get("quiet_applied")),
+                manual=bool(data.get("manual")),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
 
 
 @dataclass(slots=True)
@@ -127,12 +188,17 @@ class Room:
     last_result: str | None = None  # done / interrupted / failed / stopped
 
 
+def update_signal(entry_id: str) -> str:
+    """Dispatcher signal sent when anything of an entry changes."""
+    return f"{DOMAIN}_{entry_id}_update"
+
+
 def _time(value: str | None) -> time | None:
     return dt_util.parse_time(value) if value else None
 
 
 def _iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value else None
+    return dt_util.as_local(value).isoformat() if value else None
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -205,6 +271,8 @@ class TidyRoomsEngine:
                 state=RoomState(),
                 clean_action=d.get(CONF_CLEAN_ACTION) or None,
             )
+        # Priority order (last tie-breaker of the plan): set from the panel.
+        self.rooms = self._ordered(self.rooms, opts.get(CONF_ROOM_ORDER) or [])
 
         self.enabled = True
         self.job: Job | None = None
@@ -219,17 +287,41 @@ class TidyRoomsEngine:
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )
         self._context = Context()
+        self.history = JobHistory(hass, entry.entry_id)
+        self.loaded_config = self.config_key(entry)
+
+    @staticmethod
+    def _ordered(rooms: dict[str, Room], order: list[str]) -> dict[str, Room]:
+        """Rooms in `order`; rooms missing from it keep their order, at the end."""
+        rank = {room_id: i for i, room_id in enumerate(order)}
+        ids = sorted(rooms, key=lambda r: rank.get(r, len(rank)))
+        return {room_id: rooms[room_id] for room_id in ids}
+
+    @staticmethod
+    def config_key(entry: ConfigEntry) -> tuple:
+        """What needs a reload when it changes (the room order does not)."""
+        options = {k: v for k, v in entry.options.items() if k != CONF_ROOM_ORDER}
+        rooms = {
+            sid: (sub.title, dict(sub.data)) for sid, sub in entry.subentries.items()
+        }
+        return (repr(sorted(options.items())), repr(sorted(rooms.items())), entry.title)
+
+    def apply_order(self, order: list[str]) -> None:
+        """Change the priority order without a reload."""
+        self.rooms = self._ordered(self.rooms, order)
+        self._evaluate()
 
     # ------------------------------------------------------------------ setup
 
     @property
     def signal(self) -> str:
         """Dispatcher signal sent when anything changes."""
-        return f"{DOMAIN}_{self.entry.entry_id}_update"
+        return update_signal(self.entry.entry_id)
 
     async def async_start(self) -> None:
         """Restore state and start listening."""
         await self._async_restore()
+        await self.history.async_load()
         await self._async_build_scripts()
         now = dt_util.now()
         self._roll_day(now)
@@ -239,6 +331,12 @@ class TidyRoomsEngine:
             state = self.hass.states.get(sensor)
             if state and state.state == STATE_ON:
                 self._wake_on_since[sensor] = state.last_changed
+        if self.job is not None:
+            # Restored job: catch up with what the robot did meanwhile.
+            if self.job_entity and (js := self.hass.states.get(self.job_entity)):
+                self._on_job_entity(js.state, now)
+            elif vs := self.hass.states.get(self.vacuum_entity):
+                self._on_vacuum(vs.state, now)
 
         watched = {self.vacuum_entity, *self.wake_sensors}
         for room in self.rooms.values():
@@ -262,6 +360,7 @@ class TidyRoomsEngine:
             unsub()
         self._unsubs.clear()
         await self._store.async_save(self._serialize())
+        await self.history.async_save()
 
     async def _async_build_scripts(self) -> None:
         """Validate the custom clean actions (the selector does not)."""
@@ -303,12 +402,20 @@ class TidyRoomsEngine:
             st.last_full = _dt(saved.get("last_full"))
             st.last_vacuum = _dt(saved.get("last_vacuum"))
             room.last_result = saved.get("last_result")
+        job = Job.restore(raw) if (raw := data.get("job")) else None
+        if (
+            job is not None
+            and job.decision.room_id in self.rooms
+            and dt_util.now() - job.created < MAX_JOB_DURATION
+        ):
+            self.job = job
 
     def _serialize(self) -> dict[str, Any]:
         return {
             "day": self._day,
             "awake_day": self._awake_day,
             "enabled": self.enabled,
+            "job": self.job.serialize() if self.job else None,
             "rooms": {
                 room_id: {
                     "enabled": r.state.enabled,
@@ -532,7 +639,22 @@ class TidyRoomsEngine:
         job = self.job
         if job is None:
             return
-        self.rooms[job.decision.room_id].last_result = result
+        room = self.rooms[job.decision.room_id]
+        room.last_result = result
+        self.history.add(
+            JobRecord(
+                room_id=room.subentry_id,
+                room=room.config.name,
+                kind=job.decision.kind.value,
+                forced=job.decision.forced,
+                quiet=job.decision.quiet or job.quiet_applied,
+                manual=job.manual,
+                attempts=job.attempts,
+                started=job.created.isoformat(),
+                ended=dt_util.now().isoformat(),
+                result=result,
+            )
+        )
         self.job = None
         self._save()
         self._notify()
@@ -580,10 +702,15 @@ class TidyRoomsEngine:
             self._start_job(result.decision, now)
         self._notify()
 
-    def _start_job(self, decision: Decision, now: datetime) -> None:
+    def _start_job(self, decision: Decision, now: datetime, manual: bool = False) -> None:
         self.job = Job(
-            decision=decision, phase=JobPhase.STARTING, started=now, created=now
+            decision=decision,
+            phase=JobPhase.STARTING,
+            started=now,
+            created=now,
+            manual=manual,
         )
+        self._save()
         self.job.quiet_applied = decision.quiet
         _LOGGER.info(
             "Cleaning %s (%s%s)",
@@ -605,8 +732,17 @@ class TidyRoomsEngine:
                 else CleanKind.VACUUM
             )
         # Forced: someone asked for it, so presence must not interrupt it.
-        self._start_job(Decision(room_id, kind, forced=True, quiet=False), dt_util.now())
+        self._start_job(
+            Decision(room_id, kind, forced=True, quiet=False), dt_util.now(), manual=True
+        )
         self._notify()
+
+    async def async_stop_job(self) -> None:
+        """Stop the current job and send the robot back to the dock."""
+        if self.job is None:
+            return
+        self._end_job("stopped")
+        await self._async_return_home()
 
     async def async_set_enabled(self, enabled: bool) -> None:
         """Pause or resume automatic cleaning."""
@@ -678,3 +814,110 @@ class TidyRoomsEngine:
 
     def _notify(self) -> None:
         async_dispatcher_send(self.hass, self.signal)
+
+    # ----------------------------------------------------------------- panel
+
+    def outlooks(self, now: datetime) -> dict[str, RoomOutlook]:
+        """When each room's next pass can start (an estimate)."""
+        awake = self.awake
+        return {
+            room_id: outlook(
+                now,
+                self.gcfg,
+                r.config,
+                replace(r.state, enabled=False) if r.action_error else r.state,
+                awake=awake,
+            )
+            for room_id, r in self.rooms.items()
+        }
+
+    def snapshot(self) -> dict[str, Any]:
+        """Everything the panel shows, JSON-ready."""
+        now = dt_util.now()
+        outlooks = self.outlooks(now)
+        vac = self.hass.states.get(self.vacuum_entity)
+        robot = self._robot()
+        job = self.job
+        wake_today = bool(self.wake_sensors) and WEEKDAYS[now.weekday()] in self.wake_days
+        quiet = self.gcfg
+        return {
+            "entry_id": self.entry.entry_id,
+            "title": self.entry.title,
+            "enabled": self.enabled,
+            "now": now.isoformat(),
+            "awake": self.awake,
+            "wake_check_today": wake_today,
+            "quiet_start": quiet.quiet_start.isoformat() if quiet.quiet_start else None,
+            "quiet_end": quiet.quiet_end.isoformat() if quiet.quiet_end else None,
+            "min_battery": quiet.min_battery,
+            "paused_until": _iso(self._failed_until)
+            if self._failed_until and now < self._failed_until
+            else None,
+            "robot": {
+                "entity_id": self.vacuum_entity,
+                "name": vac.name if vac else self.vacuum_entity,
+                "state": vac.state if vac else None,
+                "available": robot.available,
+                "idle": robot.idle,
+                "battery": robot.battery,
+                "fan_speed": vac.attributes.get("fan_speed") if vac else None,
+            },
+            "job": {
+                "room_id": job.decision.room_id,
+                "room": self.rooms[job.decision.room_id].config.name,
+                "kind": job.decision.kind.value,
+                "forced": job.decision.forced,
+                "quiet": job.decision.quiet or job.quiet_applied,
+                "manual": job.manual,
+                "phase": job.phase.value,
+                "created": job.created.isoformat(),
+                "attempts": job.attempts,
+            }
+            if job
+            else None,
+            "next_room": next_room(outlooks, list(self.rooms)),
+            "rooms": [
+                self._room_snapshot(r, outlooks[room_id])
+                for room_id, r in self.rooms.items()
+            ],
+        }
+
+    def _room_snapshot(self, room: Room, ol: RoomOutlook) -> dict[str, Any]:
+        cfg, st = room.config, room.state
+        status = self.last_plan.statuses.get(room.subentry_id)
+        return {
+            "id": room.subentry_id,
+            "name": cfg.name,
+            "area_id": room.area_id,
+            "enabled": st.enabled,
+            "status": status.value if status else None,
+            "action_error": room.action_error,
+            "occupancy_sensors": list(cfg.occupancy_sensors),
+            "proxy_sensors": list(cfg.proxy_sensors),
+            "occupied": st.occupied,
+            "empty_since": _iso(st.empty_since),
+            "proxy_active": st.proxy_active,
+            "empty_minutes": cfg.empty_minutes,
+            "full_today": st.full_today,
+            "full_per_day": cfg.full_per_day,
+            "vacuum_today": st.vacuum_today,
+            "vacuum_per_day": cfg.vacuum_per_day,
+            "min_gap_hours": cfg.min_gap.total_seconds() / 3600,
+            "full_deadline": cfg.full_deadline.isoformat() if cfg.full_deadline else None,
+            "vacuum_deadline": cfg.vacuum_deadline.isoformat()
+            if cfg.vacuum_deadline
+            else None,
+            "last_full": _iso(st.last_full),
+            "last_vacuum": _iso(st.last_vacuum),
+            "last_result": room.last_result,
+            "custom_action": room.clean_action is not None,
+            "outlook": {
+                "kind": ol.kind.value if ol.kind else None,
+                "earliest": _iso(ol.earliest),
+                "reason": ol.reason.value if ol.reason else None,
+                "free_at": _iso(ol.free_at),
+                "deadline": _iso(ol.deadline),
+                "full_left": ol.full_left,
+                "vacuum_left": ol.vacuum_left,
+            },
+        }

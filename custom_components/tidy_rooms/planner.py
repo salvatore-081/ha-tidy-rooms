@@ -233,3 +233,137 @@ def should_interrupt(
     if cfg.proxy_sensors:
         return not st.proxy_active
     return False
+
+
+class WaitReason(StrEnum):
+    """What the next pass of a room is waiting for."""
+
+    GAP = "gap"  # minimum gap since the last pass
+    QUIET_HOURS = "quiet_hours"
+    AWAKE = "awake"  # wake-up check, time unknown
+    EMPTY = "empty"  # room empty, not for long enough yet
+    OCCUPIED = "occupied"  # someone is there: no time known until the deadline
+    NOT_TODAY = "not_today"  # cannot start before midnight
+
+
+@dataclass(frozen=True, slots=True)
+class RoomOutlook:
+    """When the next pass of a room can start, as far as we can tell now.
+
+    The presence sensors can change at any time: `earliest` assumes the room
+    stays as it is now (empty rooms stay empty, occupied rooms stay occupied
+    until their deadline).
+    """
+
+    kind: CleanKind | None  # next pass still due today
+    earliest: datetime | None  # None: done, unknown, or not today
+    reason: WaitReason | None  # what `earliest` waits for (None: can start now)
+    free_at: datetime | None  # when the room counts as empty, if it stays so
+    deadline: datetime | None  # when the pass is forced
+    full_left: int
+    vacuum_left: int
+
+
+def _at(now: datetime, t: time) -> datetime:
+    return now.replace(hour=t.hour, minute=t.minute, second=t.second, microsecond=0)
+
+
+def _after_quiet(moment: datetime, gcfg: GlobalConfig) -> datetime:
+    """Move `moment` to the end of quiet hours if it falls inside them."""
+    if (
+        gcfg.quiet_start is None
+        or gcfg.quiet_end is None
+        or not in_window(moment.time(), gcfg.quiet_start, gcfg.quiet_end)
+    ):
+        return moment
+    end = _at(moment, gcfg.quiet_end)
+    return end if end > moment else end + timedelta(days=1)
+
+
+def outlook(
+    now: datetime,
+    gcfg: GlobalConfig,
+    cfg: RoomConfig,
+    st: RoomState,
+    *,
+    awake: bool = True,
+) -> RoomOutlook:
+    """Estimate when the next pass of a room can start."""
+    full_left = max(cfg.full_per_day - st.full_today, 0)
+    vacuum_left = max(cfg.vacuum_per_day - st.vacuum_today, 0)
+    kind = (
+        CleanKind.FULL if full_left else CleanKind.VACUUM if vacuum_left else None
+    )
+    if kind is None or not st.enabled:
+        return RoomOutlook(kind, None, None, None, None, full_left, vacuum_left)
+
+    def local(moment: datetime) -> datetime:
+        # Sensor timestamps are UTC: compare times and dates in `now`'s zone.
+        if moment.tzinfo is not None and now.tzinfo is not None:
+            return moment.astimezone(now.tzinfo)
+        return moment
+
+    deadline_t = cfg.full_deadline if kind is CleanKind.FULL else cfg.vacuum_deadline
+    deadline = _at(now, deadline_t) if deadline_t is not None else None
+
+    # Time constraints: minimum gap (vacuum passes only), quiet hours.
+    start, reason = now, None
+    if kind is CleanKind.VACUUM and st.last_vacuum is not None:
+        gap_end = local(st.last_vacuum) + cfg.min_gap
+        if gap_end > start:
+            start, reason = gap_end, WaitReason.GAP
+    moved = _after_quiet(start, gcfg)
+    if moved != start:
+        start, reason = moved, WaitReason.QUIET_HOURS
+
+    # Presence: the room must be empty long enough, unless the deadline passed.
+    free_at: datetime | None = None
+    occupied = False
+    if cfg.occupancy_sensors:
+        if st.occupied is False and st.empty_since is not None:
+            free_at = local(st.empty_since) + timedelta(minutes=cfg.empty_minutes)
+        else:
+            occupied = True
+    elif cfg.proxy_sensors and not st.proxy_active:
+        occupied = True
+
+    candidates: list[tuple[datetime, WaitReason | None]] = []
+    if not occupied:
+        if free_at is not None and free_at > start:
+            candidates.append((free_at, WaitReason.EMPTY))
+        else:
+            candidates.append((start, reason))
+    if deadline is not None:
+        forced_at = max(start, deadline)
+        candidates.append((forced_at, reason if forced_at == start else WaitReason.OCCUPIED))
+
+    if not candidates:
+        return RoomOutlook(
+            kind, None, WaitReason.OCCUPIED, free_at, deadline, full_left, vacuum_left
+        )
+    earliest, reason = min(candidates, key=lambda c: c[0])
+    if not awake and reason is None:
+        reason = WaitReason.AWAKE
+    if earliest.date() != now.date():
+        return RoomOutlook(
+            kind, None, WaitReason.NOT_TODAY, free_at, deadline, full_left, vacuum_left
+        )
+    return RoomOutlook(kind, earliest, reason, free_at, deadline, full_left, vacuum_left)
+
+
+def next_room(
+    outlooks: dict[str, RoomOutlook],
+    order: list[str],
+) -> str | None:
+    """The room expected to be cleaned next: earliest start, then `plan()` priorities."""
+    best: tuple | None = None
+    best_id: str | None = None
+    for index, room_id in enumerate(order):
+        ol = outlooks.get(room_id)
+        if ol is None or ol.earliest is None or ol.kind is None:
+            continue
+        forced = ol.deadline is not None and ol.earliest >= ol.deadline
+        key = (ol.earliest, 0 if forced else 1, 0 if ol.kind is CleanKind.FULL else 1, index)
+        if best is None or key < best:
+            best, best_id = key, room_id
+    return best_id
