@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
@@ -68,7 +69,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     )
                     if entity_id:
                         registry.async_remove(entity_id)
-        options = {k: v for k, v in entry.options.items() if k not in LEGACY_OPTION_KEYS}
+        options = {
+            k: v for k, v in entry.options.items() if k not in LEGACY_OPTION_KEYS
+        }
         hass.config_entries.async_update_entry(entry, options=options, version=2)
     return True
 
@@ -95,7 +98,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: TidyRoomsConfigEntry) ->
     return True
 
 
-async def _async_entry_updated(hass: HomeAssistant, entry: TidyRoomsConfigEntry) -> None:
+async def _async_entry_updated(
+    hass: HomeAssistant, entry: TidyRoomsConfigEntry
+) -> None:
     """Rooms or settings changed: rebuild everything, unless only the order did."""
     engine = entry.runtime_data
     if TidyRoomsEngine.config_key(entry) == engine.loaded_config:
@@ -108,17 +113,25 @@ async def async_unload_entry(hass: HomeAssistant, entry: TidyRoomsConfigEntry) -
     """Unload a config entry."""
     await entry.runtime_data.async_stop()
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    others = [
-        e
-        for e in hass.config_entries.async_entries(DOMAIN)
-        if e.entry_id != entry.entry_id and e.state is ConfigEntryState.LOADED
-    ]
-    if not others:
+    # The panel stays through a reload (a room, a program or the settings
+    # saved): removing it, even for a moment, sends the browser away from it.
+    # It goes when the last entry is disabled or removed.
+    if entry.disabled_by is not None and not _panel_needed(hass, entry):
         panel.async_unregister(hass)
     return unloaded
 
 
+def _panel_needed(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Whether another entry, not disabled, still uses the panel."""
+    return any(
+        e.entry_id != entry.entry_id and e.disabled_by is None
+        for e in hass.config_entries.async_entries(DOMAIN)
+    )
+
+
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Delete the saved state and the job log of a removed entry."""
+    """Delete the saved state, the job log and, if last, the panel of a removed entry."""
     await Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}").async_remove()
     await JobHistory(hass, entry.entry_id).async_remove()
+    if not _panel_needed(hass, entry):
+        panel.async_unregister(hass)

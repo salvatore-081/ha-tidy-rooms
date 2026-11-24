@@ -60,7 +60,7 @@ show_outlook: true
 2. Add `https://github.com/salvatore-081/ha-tidy-rooms` as an **Integration**.
 3. Install **Tidy Rooms** and restart Home Assistant.
 
-Install a release: the panel and the card are built when a release is published and ship only in its zip (`tidy_rooms.zip`). Installed from a commit, the integration works without them.
+Install a release: the panel and the card are built when a release is published and ship only in its zip (`tidy_rooms.zip`). Installed from a commit, the integration works without them. The panel and the card stay registered while a robot's configuration reloads (a room, a program or the settings saved) and go away when the last robot is removed or disabled; after an upgrade, restart Home Assistant to load the new card.
 
 ### Manual
 

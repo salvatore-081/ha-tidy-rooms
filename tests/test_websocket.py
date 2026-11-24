@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 import json
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigEntryDisabler, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.tidy_rooms import panel
@@ -23,8 +25,10 @@ from custom_components.tidy_rooms.const import (
     CONF_OCCUPANCY_SENSORS,
     CONF_QUIET_FAN_SPEED,
     CONF_ROOM_ORDER,
+    CONF_VACUUM,
     CONF_VACUUM_PER_DAY,
     CONF_WORK_MODE_ENTITY,
+    DOMAIN,
     SUBENTRY_ROOM,
 )
 
@@ -86,11 +90,15 @@ async def test_unknown_entry(hass: HomeAssistant, freezer, hass_ws_client) -> No
     assert res["error"]["code"] == "not_found"
 
 
-async def test_room_schema_and_save(hass: HomeAssistant, freezer, hass_ws_client) -> None:
+async def test_room_schema_and_save(
+    hass: HomeAssistant, freezer, hass_ws_client
+) -> None:
     client = await _ws(hass_ws_client, hass)
     entry, kitchen, _ = await make(hass, freezer)
 
-    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
+    res = await _call(
+        client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room"
+    )
     result = res["result"]
     names = [f["name"] for f in result["schema"]]
     assert names == [
@@ -146,7 +154,11 @@ async def test_room_schema_and_save(hass: HomeAssistant, freezer, hass_ws_client
     async def save(data, room_id=None):
         extra = {"room_id": room_id} if room_id else {}
         res = await _call(
-            client, type="tidy_rooms/room/save", entry_id=entry.entry_id, data=data, **extra
+            client,
+            type="tidy_rooms/room/save",
+            entry_id=entry.entry_id,
+            data=data,
+            **extra,
         )
         await hass.async_block_till_done()
         return res["result"]
@@ -191,9 +203,9 @@ async def test_room_schema_and_save(hass: HomeAssistant, freezer, hass_ws_client
         {**saved[1], "start": None},
         {**saved[0], "id": "made-up"},
     ]
-    assert await save({CONF_AREA: living.id, CONF_EMPTY_MINUTES: 20, "passes": swapped}, new_id) == {
-        "room_id": new_id
-    }
+    assert await save(
+        {CONF_AREA: living.id, CONF_EMPTY_MINUTES: 20, "passes": swapped}, new_id
+    ) == {"room_id": new_id}
     again = entry.subentries[new_id].data["passes"]
     assert again[0]["id"] == saved[1]["id"] and "start" not in again[0]
     assert again[1]["id"] not in ("made-up", saved[0]["id"])
@@ -254,7 +266,9 @@ async def test_pass_validation(
         assert res["result"] == {"room_id": room_id}
 
 
-async def test_reorder_without_reload(hass: HomeAssistant, freezer, hass_ws_client) -> None:
+async def test_reorder_without_reload(
+    hass: HomeAssistant, freezer, hass_ws_client
+) -> None:
     client = await _ws(hass_ws_client, hass)
     entry, _, _ = await make(hass, freezer)
     living = ar.async_get(hass).async_create("Living")
@@ -297,11 +311,18 @@ async def test_reorder_without_reload(hass: HomeAssistant, freezer, hass_ws_clie
 async def test_settings(hass: HomeAssistant, freezer, hass_ws_client) -> None:
     client = await _ws(hass_ws_client, hass)
     entry, _, _ = await make(hass, freezer)
-    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="settings")
+    res = await _call(
+        client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="settings"
+    )
     sections = res["result"]["sections"]
     assert set(sections) == {"schedule", "wake", "signals", "robot"}
     robot = [f["name"] for f in sections["robot"]]
-    assert robot == ["min_battery", "normal_fan_speed", "quiet_fan_speed", "restore_settings"]
+    assert robot == [
+        "min_battery",
+        "normal_fan_speed",
+        "quiet_fan_speed",
+        "restore_settings",
+    ]
     values = res["result"]["values"]
     assert values[CONF_QUIET_FAN_SPEED] == "quiet"
 
@@ -318,7 +339,9 @@ async def test_settings(hass: HomeAssistant, freezer, hass_ws_client) -> None:
     engine = entry.runtime_data
     new = {**values, "min_battery": 40, "wake_minutes": 15}
     new.pop(CONF_WORK_MODE_ENTITY)
-    res = await _call(client, type="tidy_rooms/settings/save", entry_id=entry.entry_id, data=new)
+    res = await _call(
+        client, type="tidy_rooms/settings/save", entry_id=entry.entry_id, data=new
+    )
     assert res["result"] == {}
     await hass.async_block_till_done()
     assert entry.options["min_battery"] == 40
@@ -342,7 +365,9 @@ async def test_commands_and_history(
     engine = entry.runtime_data
     room_id = next(iter(engine.rooms))
 
-    res = await _call(client, type="tidy_rooms/set_enabled", entry_id=entry.entry_id, enabled=False)
+    res = await _call(
+        client, type="tidy_rooms/set_enabled", entry_id=entry.entry_id, enabled=False
+    )
     assert res["success"] and engine.enabled is False
     await advance(hass, freezer, 11)
     assert calls["clean_area"] == []
@@ -400,9 +425,13 @@ async def test_read_only_user(
     res = await _call(client, type="tidy_rooms/subscribe", entry_id=entry.entry_id)
     assert res["success"]  # the card works for every user
     await client.receive_json()
-    res = await _call(client, type="tidy_rooms/set_enabled", entry_id=entry.entry_id, enabled=False)
+    res = await _call(
+        client, type="tidy_rooms/set_enabled", entry_id=entry.entry_id, enabled=False
+    )
     assert res["error"]["code"] == "unauthorized"
-    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
+    res = await _call(
+        client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room"
+    )
     assert res["error"]["code"] == "unauthorized"
 
 
@@ -479,9 +508,174 @@ async def test_panel_registered_once_and_removed(
         assert kwargs["config"]["_panel_custom"]["js_url"].endswith(f"?v={version}")
         add_js.assert_called_once()
 
-        await hass.config_entries.async_unload(entry.entry_id)
+        # A reload (a room, a program or the settings saved) keeps the panel:
+        # removing it would send the browser away from it.
+        await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert register.call_count == 1 and add_js.call_count == 1
+        remove.assert_not_called()
+        remove_js.assert_not_called()
+
+        # Removing the last entry removes the panel and the card.
+        await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
         remove.assert_called_once_with(hass, "tidy-rooms")
         remove_js.assert_called_once()
+
+
+def _fake_frontend(hass: HomeAssistant, tmp_path: Path) -> None:
+    (tmp_path / panel.PANEL_FILE).write_text("")
+    (tmp_path / panel.CARD_FILE).write_text("")
+    hass.config.components.add("frontend")
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+
+
+async def test_panel_stays_through_saves(
+    hass: HomeAssistant, freezer, tmp_path, hass_ws_client
+) -> None:
+    _fake_frontend(hass, tmp_path)
+    client = await _ws(hass_ws_client, hass)
+    with (
+        patch.object(panel, "FRONTEND_DIR", tmp_path),
+        patch.object(panel, "async_register_built_in_panel") as register,
+        patch.object(panel, "add_extra_js_url") as add_js,
+        patch.object(panel, "async_remove_panel") as remove,
+        patch.object(panel, "remove_extra_js_url") as remove_js,
+    ):
+        entry, kitchen, _ = await make(hass, freezer)
+        entry_id = entry.entry_id
+        room_id = next(iter(entry.subentries))
+        passes = entry.subentries[room_id].data["passes"]
+
+        def assert_panel_kept(step: str) -> None:
+            assert entry.state is ConfigEntryState.LOADED, step
+            assert register.call_count == 1, step
+            assert add_js.call_count == 1, step
+            remove.assert_not_called()
+            remove_js.assert_not_called()
+
+        async def call(step: str, **msg) -> dict:
+            res = await _call(client, entry_id=entry_id, **msg)
+            assert res["success"], (step, res)
+            await hass.async_block_till_done()
+            assert_panel_kept(step)
+            return res["result"]
+
+        engine = entry.runtime_data
+        await call(
+            "room save",
+            type="tidy_rooms/room/save",
+            room_id=room_id,
+            data={CONF_AREA: kitchen.id, CONF_EMPTY_MINUTES: 15, "passes": passes},
+        )
+        assert entry.runtime_data is not engine  # reloaded
+        await call(
+            "program save",
+            type="tidy_rooms/room/save",
+            room_id=room_id,
+            data={
+                CONF_AREA: kitchen.id,
+                CONF_EMPTY_MINUTES: 15,
+                "passes": [*passes, {"work_mode": "vacuum", "forced": False}],
+            },
+        )
+        living = ar.async_get(hass).async_create("Living")
+        new_id = (
+            await call(
+                "room add",
+                type="tidy_rooms/room/save",
+                data={CONF_AREA: living.id, CONF_EMPTY_MINUTES: 5, "passes": []},
+            )
+        )["room_id"]
+        res = await _call(
+            client, type="tidy_rooms/schema", entry_id=entry_id, form="settings"
+        )
+        values = {**res["result"]["values"], "min_battery": 30, "wake_minutes": 15}
+        values.pop(CONF_WORK_MODE_ENTITY)
+        assert (
+            await call("settings save", type="tidy_rooms/settings/save", data=values)
+            == {}
+        )
+        assert entry.options["min_battery"] == 30
+        await call(
+            "room reorder", type="tidy_rooms/room/reorder", order=[new_id, room_id]
+        )
+        await call(
+            "room disable",
+            type="tidy_rooms/room/set_enabled",
+            room_id=room_id,
+            enabled=False,
+        )
+        await call("room delete", type="tidy_rooms/room/delete", room_id=new_id)
+        assert set(entry.runtime_data.rooms) == {room_id}
+
+
+async def test_panel_removed_when_the_entry_is_disabled(
+    hass: HomeAssistant, freezer, tmp_path
+) -> None:
+    _fake_frontend(hass, tmp_path)
+    with (
+        patch.object(panel, "FRONTEND_DIR", tmp_path),
+        patch.object(panel, "async_register_built_in_panel") as register,
+        patch.object(panel, "add_extra_js_url"),
+        patch.object(panel, "async_remove_panel") as remove,
+        patch.object(panel, "remove_extra_js_url") as remove_js,
+    ):
+        entry, _, _ = await make(hass, freezer)
+        await hass.config_entries.async_set_disabled_by(
+            entry.entry_id, ConfigEntryDisabler.USER
+        )
+        await hass.async_block_till_done()
+        remove.assert_called_once_with(hass, "tidy-rooms")
+        remove_js.assert_called_once()
+
+        # Enabled again: registered again.
+        await hass.config_entries.async_set_disabled_by(entry.entry_id, None)
+        await hass.async_block_till_done()
+        assert register.call_count == 2
+
+
+async def test_panel_kept_while_another_robot_uses_it(
+    hass: HomeAssistant, freezer, tmp_path
+) -> None:
+    _fake_frontend(hass, tmp_path)
+    with (
+        patch.object(panel, "FRONTEND_DIR", tmp_path),
+        patch.object(panel, "async_register_built_in_panel") as register,
+        patch.object(panel, "add_extra_js_url"),
+        patch.object(panel, "async_remove_panel") as remove,
+        patch.object(panel, "remove_extra_js_url"),
+    ):
+        entry, _, _ = await make(hass, freezer)
+        other = MockConfigEntry(
+            domain=DOMAIN, title="Other", data={CONF_VACUUM: VACUUM}
+        )
+        other.add_to_hass(hass)
+        await hass.config_entries.async_set_disabled_by(
+            entry.entry_id, ConfigEntryDisabler.USER
+        )
+        await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
+        remove.assert_not_called()  # the other entry still uses it
+
+        await hass.config_entries.async_remove(other.entry_id)
+        await hass.async_block_till_done()
+        remove.assert_called_once_with(hass, "tidy-rooms")
+        assert register.call_count == 1
+
+
+def test_versions_match() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads(
+        (root / "custom_components/tidy_rooms/manifest.json").read_text()
+    )
+    frontend = json.loads((root / "frontend/package.json").read_text())
+    lock = json.loads((root / "frontend/package-lock.json").read_text())
+    project = (root / "pyproject.toml").read_text()
+    version = "0.4.2"
+    assert manifest["version"] == frontend["version"] == version
+    assert lock["version"] == lock["packages"][""]["version"] == version
+    assert f'version = "{version}"' in project
 
 
 async def test_panel_missing_js(
@@ -506,8 +700,13 @@ async def test_pass_form_offers_robot_settings(
     room_id = next(iter(entry.subentries))
     sub = entry.subentries[room_id]
     # A work mode the robot does not offer (any more) stays among the choices.
-    passes = [{**p, "work_mode": "mop"} if p["id"] == "full-1" else p for p in sub.data["passes"]]
-    hass.config_entries.async_update_subentry(entry, sub, data={**sub.data, "passes": passes})
+    passes = [
+        {**p, "work_mode": "mop"} if p["id"] == "full-1" else p
+        for p in sub.data["passes"]
+    ]
+    hass.config_entries.async_update_subentry(
+        entry, sub, data={**sub.data, "passes": passes}
+    )
     await hass.async_block_till_done()
     res = await _call(
         client,
@@ -530,6 +729,8 @@ async def test_pass_form_without_work_mode_entity(
 ) -> None:
     client = await _ws(hass_ws_client, hass)
     entry, _, _ = await make(hass, freezer, options={CONF_WORK_MODE_ENTITY: None})
-    res = await _call(client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room")
+    res = await _call(
+        client, type="tidy_rooms/schema", entry_id=entry.entry_id, form="room"
+    )
     names = [f["name"] for f in res["result"]["pass_schema"]]
     assert "fan_speed" in names and "work_mode" not in names
