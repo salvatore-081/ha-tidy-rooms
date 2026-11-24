@@ -128,19 +128,25 @@ async def make(
 
 
 def status(hass: HomeAssistant) -> str:
-    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_status")]
+    states = [
+        s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_status")
+    ]
     assert len(states) == 1
     return states[0].state
 
 
-async def advance(hass: HomeAssistant, freezer: FrozenDateTimeFactory, minutes: int) -> None:
+async def advance(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, minutes: int
+) -> None:
     for _ in range(minutes):
         freezer.tick(timedelta(minutes=1))
         async_fire_time_changed(hass)
         await hass.async_block_till_done()
 
 
-async def test_full_day(hass: HomeAssistant, freezer: FrozenDateTimeFactory, setup) -> None:
+async def test_full_day(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, setup
+) -> None:
     """Empty kitchen: full pass now, second vacuum after the gap."""
     _, area, calls = setup
     # The sensor went off at 10:00: the room is free after 10 minutes.
@@ -216,7 +222,9 @@ async def test_forced_and_quiet_after_deadline(
     assert calls["fan"][-1].data["fan_speed"] == "quiet"
 
 
-async def test_custom_clean_action(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+async def test_custom_clean_action(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
     """The room's custom action replaces clean_area, with templates rendered."""
     action = [
         {
@@ -260,7 +268,6 @@ async def test_job_gives_up_after_max_duration(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, setup
 ) -> None:
     """A job stuck in pause does not block the plan forever."""
-    _, _, calls = setup
     await advance(hass, freezer, 11)
     hass.states.async_set(VACUUM, "cleaning")
     await advance(hass, freezer, 5)
@@ -358,9 +365,13 @@ async def test_quiet_wins_over_room_fan_speed(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
     """Forced while someone is there: the quiet speed, not the room's."""
-    hass.states.async_set(VACUUM, "docked", {"fan_speed_list": ["quiet", "normal", "max"]})
+    hass.states.async_set(
+        VACUUM, "docked", {"fan_speed_list": ["quiet", "normal", "max"]}
+    )
     _, _, calls = await make(hass, freezer, fan_speed="max")
-    hass.states.async_set(VACUUM, "docked", {"fan_speed_list": ["quiet", "normal", "max"]})
+    hass.states.async_set(
+        VACUUM, "docked", {"fan_speed_list": ["quiet", "normal", "max"]}
+    )
     hass.states.async_set(SENSOR, "on")
     freezer.move_to("2026-01-12 18:59:30+01:00")
     await advance(hass, freezer, 1)

@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.const import EVENT_CALL_SERVICE
 from homeassistant.config_entries import ConfigSubentry
+from homeassistant.const import EVENT_CALL_SERVICE
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 

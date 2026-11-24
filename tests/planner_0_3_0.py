@@ -124,7 +124,7 @@ def due_kind(cfg: RoomConfig, st: RoomState, now: datetime) -> CleanKind | None:
     """Return the pass the room needs now, ignoring occupancy."""
     if st.full_today < cfg.full_per_day:
         return CleanKind.FULL
-    if st.vacuum_today < cfg.vacuum_per_day:
+    if st.vacuum_today < cfg.vacuum_per_day:  # noqa: SIM102 (frozen copy)
         if st.last_vacuum is None or now - st.last_vacuum >= cfg.min_gap:
             return CleanKind.VACUUM
     return None
@@ -222,9 +222,7 @@ def plan(
     return result
 
 
-def should_interrupt(
-    cfg: RoomConfig, st: RoomState, decision: Decision
-) -> bool:
+def should_interrupt(cfg: RoomConfig, st: RoomState, decision: Decision) -> bool:
     """Return True if a running job must stop because someone came in.
 
     Forced jobs never stop: they switch to the quiet fan speed instead.
@@ -294,9 +292,7 @@ def outlook(
     """Estimate when the next pass of a room can start."""
     full_left = max(cfg.full_per_day - st.full_today, 0)
     vacuum_left = max(cfg.vacuum_per_day - st.vacuum_today, 0)
-    kind = (
-        CleanKind.FULL if full_left else CleanKind.VACUUM if vacuum_left else None
-    )
+    kind = CleanKind.FULL if full_left else CleanKind.VACUUM if vacuum_left else None
     if kind is None or not st.enabled:
         return RoomOutlook(kind, None, None, None, None, full_left, vacuum_left)
 
@@ -338,7 +334,9 @@ def outlook(
             candidates.append((start, reason))
     if deadline is not None:
         forced_at = max(start, deadline)
-        candidates.append((forced_at, reason if forced_at == start else WaitReason.OCCUPIED))
+        candidates.append(
+            (forced_at, reason if forced_at == start else WaitReason.OCCUPIED)
+        )
 
     if not candidates:
         return RoomOutlook(
@@ -351,7 +349,9 @@ def outlook(
         return RoomOutlook(
             kind, None, WaitReason.NOT_TODAY, free_at, deadline, full_left, vacuum_left
         )
-    return RoomOutlook(kind, earliest, reason, free_at, deadline, full_left, vacuum_left)
+    return RoomOutlook(
+        kind, earliest, reason, free_at, deadline, full_left, vacuum_left
+    )
 
 
 def next_room(
@@ -366,7 +366,12 @@ def next_room(
         if ol is None or ol.earliest is None or ol.kind is None:
             continue
         forced = ol.deadline is not None and ol.earliest >= ol.deadline
-        key = (ol.earliest, 0 if forced else 1, 0 if ol.kind is CleanKind.FULL else 1, index)
+        key = (
+            ol.earliest,
+            0 if forced else 1,
+            0 if ol.kind is CleanKind.FULL else 1,
+            index,
+        )
         if best is None or key < best:
             best, best_id = key, room_id
     return best_id

@@ -206,7 +206,7 @@ async def test_robot_error_pauses_the_plan(
 
 
 async def test_sensors(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
-    entry, _, _ = await make(hass, freezer, room_id=ROOM)
+    await make(hass, freezer, room_id=ROOM)
     reg = er.async_get(hass)
     passes = reg.async_get_entity_id("sensor", DOMAIN, f"{ROOM}_passes_today")
     last = reg.async_get_entity_id("sensor", DOMAIN, f"{ROOM}_last_clean")

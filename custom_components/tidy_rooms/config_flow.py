@@ -40,11 +40,11 @@ from .const import (
 )
 from .schema import (
     ROOM_DEFAULTS,
-    merge_room,
     SECTION_ROBOT,
     SECTION_SCHEDULE,
     SECTION_SIGNALS,
     SECTION_WAKE,
+    merge_room,
     room_schema,
     room_title,
     settings_sections,

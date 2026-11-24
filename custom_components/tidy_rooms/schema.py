@@ -335,7 +335,9 @@ def settings_sections(
 
     robot: dict[vol.Marker, Any] = {
         vol.Required(CONF_MIN_BATTERY): selector.NumberSelector(
-            selector.NumberSelectorConfig(min=0, max=100, step=5, unit_of_measurement="%")
+            selector.NumberSelectorConfig(
+                min=0, max=100, step=5, unit_of_measurement="%"
+            )
         )
     }
     if speeds := fan_speeds(hass, entry):

@@ -87,11 +87,11 @@ class RoomStatusSensor(TidyRoomsRoomEntity, SensorEntity):
     """Why a room is waiting, or that it is done."""
 
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = [s.value for s in RoomStatus]
 
     def __init__(self, engine: TidyRoomsEngine, room: Room) -> None:
         """Initialize."""
         super().__init__(engine, room, "status")
+        self._attr_options = [s.value for s in RoomStatus]
 
     @property
     def native_value(self) -> str | None:

@@ -183,7 +183,7 @@ class Job:
                 manual=bool(data.get("manual")),
                 day=data.get("day") or dt_util.as_local(created).date().isoformat(),
             )
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return None
 
 
@@ -243,7 +243,7 @@ class RobotRestore:
                 attempts=int(data.get("attempts", 0)),
                 next_try=_dt(data.get("next_try")),
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
 
@@ -280,7 +280,7 @@ def _done_from_store(raw: list[Any]) -> list[PassDone]:
                     bool(item.get("manual")),
                 )
             )
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             continue
     return done
 
@@ -824,7 +824,10 @@ class TidyRoomsEngine:
             now,
             self.gcfg,
             [
-                (r.config, replace(r.state, enabled=False) if r.action_error else r.state)
+                (
+                    r.config,
+                    replace(r.state, enabled=False) if r.action_error else r.state,
+                )
                 for r in self.rooms.values()
             ],
             robot,
@@ -839,7 +842,9 @@ class TidyRoomsEngine:
             self._check_restore(now)
         self._notify()
 
-    def _start_job(self, decision: Decision, now: datetime, manual: bool = False) -> None:
+    def _start_job(
+        self, decision: Decision, now: datetime, manual: bool = False
+    ) -> None:
         self.job = Job(
             decision=decision,
             phase=JobPhase.STARTING,
@@ -879,7 +884,9 @@ class TidyRoomsEngine:
         Without `work_mode` (and `use_default`), the next pass's work mode.
         """
         if self.job is not None:
-            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="robot_busy")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="robot_busy"
+            )
         room = self.rooms[room_id]
         now = dt_util.now()
         if not self.work_mode_entity:
@@ -926,7 +933,9 @@ class TidyRoomsEngine:
 
     # ---------------------------------------------------------- robot calls
 
-    async def _async_call(self, domain: str, service: str, data: dict[str, Any]) -> None:
+    async def _async_call(
+        self, domain: str, service: str, data: dict[str, Any]
+    ) -> None:
         try:
             await self.hass.services.async_call(
                 domain, service, data, blocking=True, context=self._context
@@ -975,7 +984,9 @@ class TidyRoomsEngine:
             await self._async_mode(decision.work_mode)
         # Quiet (forced while someone is there) wins over the pass's own speed.
         speed = (
-            self.quiet_fan if decision.quiet else (decision.fan_speed or self.normal_fan)
+            self.quiet_fan
+            if decision.quiet
+            else (decision.fan_speed or self.normal_fan)
         )
         if speed:
             if restore is not None:
@@ -1120,7 +1131,9 @@ class TidyRoomsEngine:
         vac = self.hass.states.get(self.vacuum_entity)
         robot = self._robot()
         job = self.job
-        wake_today = bool(self.wake_sensors) and WEEKDAYS[now.weekday()] in self.wake_days
+        wake_today = (
+            bool(self.wake_sensors) and WEEKDAYS[now.weekday()] in self.wake_days
+        )
         quiet = self.gcfg
         return {
             "entry_id": self.entry.entry_id,
@@ -1150,7 +1163,9 @@ class TidyRoomsEngine:
                 "idle": robot.idle,
                 "battery": robot.battery,
                 "fan_speed": vac.attributes.get("fan_speed") if vac else None,
-                "features": int(vac.attributes.get("supported_features", 0)) if vac else 0,
+                "features": int(vac.attributes.get("supported_features", 0))
+                if vac
+                else 0,
                 "buttons": self.robot_buttons(),
             },
             "job": {
@@ -1195,7 +1210,11 @@ class TidyRoomsEngine:
     def pass_states(self, room: Room, now: datetime) -> list[PassStatus]:
         """Today's status of each pass of a room (the running job included)."""
         job = self.job
-        active = job if job is not None and job.decision.room_id == room.subentry_id else None
+        active = (
+            job
+            if job is not None and job.decision.room_id == room.subentry_id
+            else None
+        )
         return pass_states(
             room.config,
             room.state,
@@ -1204,7 +1223,9 @@ class TidyRoomsEngine:
             active_manual=active.manual if active else False,
         )
 
-    def _room_snapshot(self, room: Room, ol: RoomOutlook, now: datetime) -> dict[str, Any]:
+    def _room_snapshot(
+        self, room: Room, ol: RoomOutlook, now: datetime
+    ) -> dict[str, Any]:
         cfg, st = room.config, room.state
         status = self.last_plan.statuses.get(room.subentry_id)
         done = {d.pass_id: d for d in st.done_today}

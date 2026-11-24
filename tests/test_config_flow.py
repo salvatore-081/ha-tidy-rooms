@@ -32,7 +32,9 @@ async def _create(hass: HomeAssistant):
     hass.states.async_set(
         VACUUM, "docked", {"friendly_name": "Robot", "fan_speed_list": ["quiet", "max"]}
     )
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_VACUUM: VACUUM}
@@ -44,7 +46,9 @@ async def _create(hass: HomeAssistant):
 
 async def test_create_and_no_duplicates(hass: HomeAssistant) -> None:
     await _create(hass)
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_VACUUM: VACUUM}
     )
@@ -64,7 +68,9 @@ async def test_room_subentry(hass: HomeAssistant) -> None:
             (entry.entry_id, SUBENTRY_ROOM), context={"source": SOURCE_USER}
         )
         assert result["type"] is FlowResultType.FORM
-        return await hass.config_entries.subentries.async_configure(result["flow_id"], data)
+        return await hass.config_entries.subentries.async_configure(
+            result["flow_id"], data
+        )
 
     result = await add(
         {
@@ -123,7 +129,11 @@ async def test_options(hass: HomeAssistant) -> None:
     assert result["step_id"] == "robot"
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {CONF_MIN_BATTERY: 30, CONF_NORMAL_FAN_SPEED: "max", CONF_QUIET_FAN_SPEED: "quiet"},
+        {
+            CONF_MIN_BATTERY: 30,
+            CONF_NORMAL_FAN_SPEED: "max",
+            CONF_QUIET_FAN_SPEED: "quiet",
+        },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_QUIET_FAN_SPEED] == "quiet"

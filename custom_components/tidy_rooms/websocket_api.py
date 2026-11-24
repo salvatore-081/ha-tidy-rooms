@@ -209,7 +209,9 @@ async def ws_subscribe(
     {
         vol.Required("type"): "tidy_rooms/history",
         vol.Required("entry_id"): str,
-        vol.Optional("days", default=7): vol.All(int, vol.Range(min=1, max=HISTORY_DAYS)),
+        vol.Optional("days", default=7): vol.All(
+            int, vol.Range(min=1, max=HISTORY_DAYS)
+        ),
         vol.Optional("room_id"): str,
     }
 )
@@ -363,7 +365,9 @@ async def ws_room_reorder(
     """Change the room priority (no reload: see __init__)."""
     entry = _entry(hass, msg["entry_id"])
     rooms = {
-        sid for sid, sub in entry.subentries.items() if sub.subentry_type == SUBENTRY_ROOM
+        sid
+        for sid, sub in entry.subentries.items()
+        if sub.subentry_type == SUBENTRY_ROOM
     }
     order = msg["order"]
     if set(order) != rooms or len(order) != len(rooms):

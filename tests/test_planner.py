@@ -7,7 +7,6 @@ from datetime import datetime, time, timedelta
 
 import pytest
 
-from . import planner_0_3_0 as old
 from custom_components.tidy_rooms.legacy import (
     KIND_FULL,
     legacy_done,
@@ -33,6 +32,8 @@ from custom_components.tidy_rooms.planner import (
     plan,
     should_interrupt,
 )
+
+from . import planner_0_3_0 as old
 
 DAY = datetime(2026, 1, 12)  # a Monday
 READY = RobotState(available=True, idle=True, battery=100)
@@ -620,7 +621,9 @@ def test_manual_target_any_mode() -> None:
 
 def test_outlook_not_before_ignores_presence() -> None:
     """The end of the gap, even when the room is occupied until the deadline."""
-    st = RoomState(occupied=True, done_today=done("full-1", at_=at(15)), last_clean=at(15))
+    st = RoomState(
+        occupied=True, done_today=done("full-1", at_=at(15)), last_clean=at(15)
+    )
     ol = outlook(at(16), G, legacy_room(min_gap_hours=2), st)
     assert ol.earliest == at(21, 30) and ol.reason is WaitReason.OCCUPIED
     assert ol.not_before == at(17)

@@ -8,6 +8,14 @@ permissions:
   contents: read
 
 jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx ruff@0.17.6 check
+      - run: uvx ruff@0.17.6 format --check
+
   pytest:
     runs-on: ubuntu-latest
     steps:
